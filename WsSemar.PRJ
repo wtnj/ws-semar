@@ -16,43 +16,7 @@ Group Web Service
       FoldersCount=2
       Folder Fontes
          VSSPath=Fontes
-         FilesCount=12
-         File \Projetos\Advpl\webservice\WSSEMAR.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\testeGlobal.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\testearray.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\exAins.prw
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\testewebservice.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\emailauditores.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\tativa.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\tsa1.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\smgetSeq.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\tcotacao.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\testeDeData.PRW
-             Type=T
-         End
-         File \Projetos\Advpl\webservice\doDataSx.PRW
-             Type=T
-         End
+         FilesCount=0
       End
       Folder Definições
          VSSPath=Definições
