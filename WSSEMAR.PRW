@@ -1,0 +1,2193 @@
+#INCLUDE "APWEBSRV.CH"
+#INCLUDE "PROTHEUS.CH"
+#Include "Topconn.ch"
+#Include "aarray.ch"
+#Include "json.ch"
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                          
+++===========================================================================++
+++ Função:    | #WSSEMAR #Autor: Alexandre Clayton (Semar) #Data: 20.12.2013 ++
+++===========================================================================++
+++ Descrição: | Web Service responsavel pela integração do portal do Cliente ++
+++            | e do portal do fornecedor.                                   ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:|                                                              ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++ Definição de Tipo														 ++                                                                         
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#DEFINE STR0001 "Web Service responsável por integrar os portais de Cliente/Fornecedor com o Protheus"
+#DEFINE STR0101 "Método responsável por retornar os campos do Dicionario/Tabela"
+#DEFINE STR0102 "Método responsável por retornar os dados do Alias ( Tabela )"
+#DEFINE STR0103 "Método responsável por retornar os dados para montar o Browse ( Listagem )"
+#DEFINE STR0104 "Método responsável por cadastrar um novo cliente/usuário"
+#DEFINE STR0105 "Método responsável por retornar uma lista de Nome/E-mail de dos Auditores do sistema"
+#DEFINE STR0106 "Busca na tabela AI3 os dados cadastrados no formulario cadastre-se, com objetivo de validar os dados informados."
+#DEFINE STR0107 "Busca na tabela AI3 os dados cadastrados no formulario cadastre-se, com objetivo de ativar o cadastro do usuário."
+#DEFINE STR0108 "Busca na tabela AI3 os dados cadastrados no formulario cadastre-se, com objetivo de cancela o cadastro do usuário."
+#DEFINE STR0109 "Busca na tabela SA1 a empresa conforme CNPJ Informado"
+#DEFINE STR0110 "Método responsável por retornar os campos do Dicionario/Tabela resumido ( Só dicionario de WSConsultaEmpresa )"
+#DEFINE STR0111 "Método responsável por atualiza a senha do usuário"
+#DEFINE STR0112 "Método responsável pelo conteudo do AI3"
+#DEFINE STR0113 "Método responsável por atualizar o conteudo do AI3"
+#DEFINE STR0114 "Método responsável por consultar cotações SC1"
+#DEFINE STR0115 "Método responsável por atualizar DATA/HORA de envio da cotação SC1"
+#DEFINE STR0116 "Método responsável por retorna JSON com dados da SC"
+#DEFINE STR0117 "Método responsável por Liberar/Rejeitar a SC"
+#DEFINE STR0118 "Método responsável por Enviar SC para cotação de preço."
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++ Definição de estruturas usadas no Web Service                           ++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++    
+// Estrutura para retorno do Dicionario de dados de uma "Aliase"/Tabela               
+	
+WSSTRUCT eDicionario
+WSDATA TituloCampo   AS String
+WSDATA Alias   		 AS String
+WSDATA IdCampo		 AS String
+WSDATA TipoCampo  	 AS String
+WSDATA TamanhoCampo  AS String
+WSDATA CampoDecimal  AS String
+WSDATA OrdemCampo 	 AS String
+WSDATA Obrigatorio   AS Boolean
+WSDATA Mascara 		 AS String Optional
+WSDATA Validacao	 AS String Optional
+WSDATA LookUp		 AS String Optional
+WSDATA UserComboBox	 AS String Optional
+WSDATA Aba			 AS String
+WSDATA Altera		 AS String
+ENDWSSTRUCT
+// Estrutura de dados para o retorno do dasdos de um Aliase/Tabela
+WSSTRUCT eDadoAliase
+WSDATA Coluna 		AS String
+WSDATA Valor		AS String
+ENDWSSTRUCT
+// Estrutura de dados ( Para uso
+WSSTRUCT eaDadoAliase
+WSDATA earDadoAliese AS Array Of eDadoAliase
+ENDWSSTRUCT
+// Estrutura de dados para o cadastro das colunas para exibição no Browse
+WSSTRUCT eDadoColsBrowse
+WSDATA Coluna 	AS String
+WSDATA Valor	AS String
+WSDATA Titulo  AS String
+ENDWSSTRUCT
+// Estrutura de dados para retorno de Nome,E-mail de Auditores do sistema
+WSSTRUCT eDadosAuditores
+WSDATA cNome		AS String
+WSDATA cEmail		AS String
+ENDWSSTRUCT
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//++ Definição do Web Service de integração de portais                       ++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++                                                                             
+WSSERVICE WSSEMAR DESCRIPTION STR0001 NAMESPACE "http://webservice.semarsistemas.com.br/wssemar.prw"
+// Variáveis
+ // Entrada/Retorno
+WSDATA UserCode		AS String
+WSDATA Alias		AS String
+WSDATA Indice		AS Integer
+WSDATA CodCliente	AS String
+WSDATA Filtro		AS String OPTIONAL
+WSDATA FiltroCols	AS String OPTIONAL
+WSDATA rGenStrDados	AS Array Of GenericStruct
+WSDATA rDadosDici	AS Array Of eDicionario
+WSDATA rDadosAliase	AS Array Of eDadoAliase
+WSDATA arDadosAliese AS Array Of eaDadoAliase
+WSDATA aColsBrowse	AS Array Of eDadoColsBrowse
+WSDATA rDadosAuditores AS Array Of eDadosAuditores
+WSDATA cRetorno		AS String
+WSDATA cDadosJson	AS String
+WSDATA CODUSU		AS String
+WSDATA cCNPJCPF		AS String
+WSDATA cTipo		AS String
+WSDATA cPSW_OLD		AS String
+WSDATA cPSW_NEW		AS String
+WSDATA cNUMSC		AS String
+WSDATA cDATAHORA	AS String
+	// Ativa/Rejeita SC
+WSDATA SITUACAO		AS String
+WSDATA MOTIVO		AS String OPTIONAL
+// Retorno
+// Métodos do Web Service	
+WSMETHOD WSGetDadosBrowse			DESCRIPTION STR0103 // Retorna os dados
+WSMETHOD WSCadastrese				DESCRIPTION STR0104 // Cadastrar um novo cliente
+WSMETHOD WSEmailsAuditores			DESCRIPTION STR0105 // Retorna a lista de Nome,E-mails dos Auditores do Portal
+WSMETHOD WSGetDadosAtivacao			DESCRIPTION STR0106 // Informações na definifição de variavel
+WSMETHOD WSAtivaCadastro			DESCRIPTION STR0107 // Informações na definifição de variavel
+WSMETHOD WSCancelarCadastro			DESCRIPTION STR0108 // Informações na definifição de variavel
+WSMETHOD WSConsultaEmpresa			DESCRIPTION STR0109 // Informações na definifição de variavel
+WSMETHOD WSDicionarioConsulEmp		DESCRIPTION STR0110 // Informações na definifição de variavel
+WSMETHOD WSTrocarSenha				DESCRIPTION STR0111 // Informações na definifição de variavel
+WSMETHOD WSUpdateMeuCadPessoal		DESCRIPTION STR0113 // Informações na definifição de variavel
+	// Metodos com retorno de dados	
+WSMETHOD WSGetDicionario 			DESCRIPTION STR0101 // Retorna o dados do dicionario de dados
+WSMETHOD WSGetDadosDicionario 		DESCRIPTION STR0102 // Retorna o dados do alias selecionado
+WSMETHOD WSGetDadosDicionarioAI3 	DESCRIPTION STR0112 // Informações na definifição de variavel
+WSMETHOD WSConsultaCotacoes			DESCRIPTION STR0114 // Informações na definifição de variavel
+WSMETHOD WSUpdateEnvioCotacoes		DESCRIPTION STR0115 // Informações na definifição de variavel
+WSMETHOD WSDadosSolicitacaoCompra	DESCRIPTION STR0116 // Informações na definifição de variavel
+WSMETHOD WSAprovaRejeitaSC			DESCRIPTION STR0117 // Informações na definifição de variavel
+WSMETHOD WSEnviaSCParaCotacao		DESCRIPTION STR0118 // Informações na definifição de variavel
+ENDWSSERVICE
+                    
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSGetDicionario #Autor: Alexandre Sette #Data: 20.12.2013 ++
+++===========================================================================++
+++ Descrição: | Retona os campos do alias passado por parametro				 ++
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, ALIAS                                              ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+WSMETHOD WSGetDicionario WSRECEIVE UserCode,Alias,Filtro,FiltroCols WSSEND rDadosDici WSSERVICE WSSEMAR
+
+Local aArea    := GetArea()
+Local lRetorno := .T.
+Local nX       := 0
+Local aColunas := {}
+
+
+If PrtChkUser(::UserCode,"WSSEMAR","WSGetDicionario")
+	dbSelectArea("SX3")
+	dbSetOrder(1)
+	MsSeek(::Alias)
+	nX := 0 // While Dados
+	nC := 0 // Colunas
+	aColunas	:= StrToKarr(cValToChar(AllTrim(::FiltroCols)),";")
+	// Lista com Filtro
+	IF Len(aColunas) > 0 .And. !empty(::FiltroCols)
+		While !Eof() .And. ::Alias == SX3->X3_ARQUIVO .And. SX3->X3_USADO <> 'ÇÇÇÇÇÇÇÇÇÇÇÇÇÇÇ'
+			FOR xJ :=1 To Len(aColunas)
+				IF cValToChar(AllTrim(SX3->X3_CAMPO)) == cValToChar(AllTrim(aColunas[xJ]))
+					nX++
+					aadd(::rDadosDici,WSClassNew("eDicionario"))
+					//::rGenStrDados[nX]:Code         := SixDescricao()
+					//::rGenStrDados[nX]:Description  := SIX->CHAVE 
+					::rDadosDici[nX]:TituloCampo	:= X3Titulo()
+					::rDadosDici[nX]:Alias     		:= SX3->X3_ARQUIVO
+					::rDadosDici[nX]:IdCampo    	:= SX3->X3_CAMPO
+					::rDadosDici[nX]:TipoCampo   	:= SX3->X3_TIPO
+					::rDadosDici[nX]:TamanhoCampo	:= cValToChar(SX3->X3_TAMANHO)
+					::rDadosDici[nX]:CampoDecimal	:= cValToChar(SX3->X3_DECIMAL)
+					::rDadosDici[nX]:OrdemCampo		:= SX3->X3_ORDEM
+					::rDadosDici[nX]:Obrigatorio	:= SX3->X3_OBRIGAT == Chr( 128 )
+					::rDadosDici[nX]:Mascara 		:= SX3->X3_PICTURE
+					::rDadosDici[nX]:Validacao  	:= SX3->X3_VALID
+					::rDadosDici[nX]:LookUp      	:= SX3->X3_F3
+					::rDadosDici[nX]:UserComboBox	:= X3CBox()
+					::rDadosDici[nX]:Aba			:= SX3->X3_FOLDER
+					::rDadosDici[nX]:Altera			:= SX3->X3_VISUAL
+				ENDIF
+			NEXT xJ
+			dbSelectArea("SX3")
+			dbSkip()
+		EndDo
+	ELSE // Lista todas as colunas do Alias
+		While !Eof() .And. ::Alias == SX3->X3_ARQUIVO .And. SX3->X3_USADO <> 'ÇÇÇÇÇÇÇÇÇÇÇÇÇÇÇ'
+			nX++
+			aadd(::rDadosDici,WSClassNew("eDicionario"))
+			//::rGenStrDados[nX]:Code         := SixDescricao()
+			//::rGenStrDados[nX]:Description  := SIX->CHAVE 
+			::rDadosDici[nX]:TituloCampo	:= X3Titulo()
+			::rDadosDici[nX]:Alias     		:= SX3->X3_ARQUIVO
+			::rDadosDici[nX]:IdCampo    	:= SX3->X3_CAMPO
+			::rDadosDici[nX]:TipoCampo   	:= SX3->X3_TIPO
+			::rDadosDici[nX]:TamanhoCampo	:= cValToChar(SX3->X3_TAMANHO)
+			::rDadosDici[nX]:CampoDecimal	:= cValToChar(SX3->X3_DECIMAL)
+			::rDadosDici[nX]:OrdemCampo		:= SX3->X3_ORDEM
+			::rDadosDici[nX]:Obrigatorio	:= SX3->X3_OBRIGAT == Chr( 128 )
+			::rDadosDici[nX]:Mascara 		:= SX3->X3_PICTURE
+			::rDadosDici[nX]:Validacao  	:= SX3->X3_VALID
+			::rDadosDici[nX]:LookUp      	:= SX3->X3_F3
+			::rDadosDici[nX]:UserComboBox	:= X3CBox()
+			::rDadosDici[nX]:Aba			:= SX3->X3_FOLDER
+			::rDadosDici[nX]:Altera			:= SX3->X3_VISUAL
+			dbSelectArea("SX3")
+			dbSkip()
+		EndDo
+	ENDIF
+Else
+	lRetorno := .F.
+EndIf
+RestArea(aArea)
+Return(lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSGetDadosDicionario #Autor: Alexandre Sette #Data: 20.12.2013 ++
+++===========================================================================++
+++ Descrição: | Retona os campos do alias passado por parametro				 ++
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, ALIAS                                              ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSGetDadosDicionario WSRECEIVE UserCode,Alias,Indice,Filtro,FiltroCols WSSEND cRetorno WSSERVICE WSSEMAR
+
+	Local aArea    	:= GetArea()
+	Local cAlias	:= ::Alias
+	Local lRetorno 	:= .T.
+	Local aColunas	:= {}
+	Local aColFilter:= {}
+
+	If PrtChkUser(::UserCode,"WSSEMAR","WSGetDadosDicionario")
+	// Seleciona o "Base de dados" ( Tabela )
+		dbSelectArea(cAlias)
+	// Seleciona o Indice do "Alias"
+		dbSetOrder(::Indice)
+		IF ::Filtro <> "?" .Or. !empty(::Filtro)
+			MsSeek(xFilial(cAlias)+(::Filtro))
+		ENDIF
+    
+	// Setando as colunas do Alias
+		aColunas 	:= DbStruct()
+		nX 			:= 1
+		aaDados		:= Array(#)
+	// Convertendo String para Array ( Colunas de Filtro )
+		aColFilter 	:= StrToKarr(cValToChar(AllTrim(::FiltroCols)),";")
+	
+		IF Len(aColFilter) > 0 .And. !empty(::FiltroCols)  // existe filtro de campos
+			While !Eof()
+			//FOR nJ :=1 TO LEN(aColFilter) 
+			//	IF cValToChar(AllTrim(aColunas[nST][1])) == cValToChar(AllTrim(aColFilter[nJ]))
+				aaDados[#(cValToChar(nX))] := Array(#)
+				For nST := 1 To Len(aColFilter)
+					aaDados[#(cValToChar(nX))][#(cValToChar(aColFilter[nST]))] := EscpJsonStr(cValToChar(AllTrim((cAlias)->&(aColFilter[nST]))))
+				Next nST
+				nX++
+			//	ENDIF
+			//Next nJ
+				dbSelectArea(cAlias)
+				dbSkip()
+			Enddo
+		ELSE // Sem filtro de campos
+			While !Eof()
+				aaDados[#(cValToChar(nX))] := Array(#)
+				For nST := 1 To Len(aColunas)
+					aaDados[#(cValToChar(nX))][#(cValToChar(aColunas[nST][1]))] := EscpJsonStr(cValToChar(AllTrim((cAlias)->&(aColunas[nST][1]))))
+				Next nST
+				nX++
+				dbSelectArea(cAlias)
+				dbSkip()
+			Enddo
+		ENDIF
+		::cRetorno := ToJson(aaDados)
+   //	::cRetorno := "ALEXANDRE # "+cAlias+" Total de Colunas "+cValToChar(Len(aColunas))
+	Else
+		lRetorno := .F.
+	EndIf
+	RestArea(aArea)
+Return(lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSGetDadosDicionario #Autor: Alexandre Sette #Data: 20.12.2013 ++
+++===========================================================================++
+++ Descrição: | Retona os campos do alias passado por parametro				 ++
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, ALIAS                                              ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSGetDadosDicionarioAI3 WSRECEIVE UserCode,Alias,Indice,Filtro,FiltroCols WSSEND cRetorno WSSERVICE WSSEMAR
+
+	Local aArea    	:= GetArea()
+	Local cAlias	:= ::Alias
+	Local lRetorno 	:= .T.
+	Local aColunas	:= {}
+	Local aColFilter:= {}
+
+	If PrtChkUser(::UserCode,"WSSEMAR","WSGetDadosDicionarioAI3")
+	// Seleciona o "Base de dados" ( Tabela )
+		dbSelectArea(cAlias)
+	// Seleciona o Indice do "Alias"
+		dbSetOrder(::Indice)
+		IF ::Filtro <> "?" .Or. !empty(::Filtro)
+			dbSeek(xFilial(cAlias)+(::Filtro))
+		ENDIF
+    
+	// Setando as colunas do Alias
+		aColunas 	:= DbStruct()
+		nX 			:= 1
+		aaDados		:= Array(#)
+	// Convertendo String para Array ( Colunas de Filtro )
+		aColFilter 	:= StrToKarr(cValToChar(AllTrim(::FiltroCols)),";")
+	
+		IF Len(aColFilter) > 0 .And. !empty(::FiltroCols)  // existe filtro de campos
+			While !Eof()
+				IF (cAlias)->AI3_CODUSU == cValToChar(AllTrim(::Filtro))
+					aaDados[#(cValToChar(nX))] := Array(#)
+					For nST := 1 To Len(aColFilter) // Percorrer as colunas
+						aaDados[#(cValToChar(nX))][#(cValToChar(aColFilter[nST]))] := EscpJsonStr(cValToChar(AllTrim((cAlias)->&(aColFilter[nST]))))
+					Next nST
+					nX++
+				ENDIF
+				dbSelectArea(cAlias)
+				dbSkip()
+			Enddo
+		ELSE // Sem filtro de campos
+			While !Eof()
+				aaDados[#(cValToChar(nX))] := Array(#)
+				For nST := 1 To Len(aColunas)
+					aaDados[#(cValToChar(nX))][#(cValToChar(aColunas[nST][1]))] := EscpJsonStr(cValToChar(AllTrim((cAlias)->&(aColunas[nST][1]))))
+				Next nST
+				nX++
+				dbSelectArea(cAlias)
+				dbSkip()
+			Enddo
+		ENDIF
+		::cRetorno := ToJson(aaDados)
+   //	::cRetorno := "ALEXANDRE # "+cAlias+" Total de Colunas "+cValToChar(Len(aColunas))
+	Else
+		lRetorno := .F.
+	EndIf
+	RestArea(aArea)
+Return(lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSGetDadosBrowser #Autor: Alexandre Sette #Data: 20.12.2013 ++
+++===========================================================================++
+++ Descrição: | Seleciona Colunas do dicionario para listar dados no aliases ++
+++            | passado por parametro 	                                 	 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, ALIAS                                              ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSGetDadosBrowse WSRECEIVE UserCode,Alias,Indice,Filtro WSSEND cRetorno WSSERVICE WSSEMAR
+
+	Local aArea    	:= GetArea()
+	Local lRetorno 	:= .T.
+	Local AliaseDici:= "SX3"
+	Local cAliasAI4 := "LISTCLI"
+	Local nX       	:= 1
+	Local cQuery	:= ""
+	Local aColunas	:= {}
+	Local aTitulos	:= {}
+
+	If PrtChkUser(::UserCode,"WSSEMAR","WSGetDadosBrowse")
+		dbSelectArea("SX3")
+		dbSetOrder(1)
+		MsSeek(::Alias)
+
+		While !Eof() .And. ::Alias == SX3->X3_ARQUIVO .And. SX3->X3_USADO <> 'ÇÇÇÇÇÇÇÇÇÇÇÇÇÇÇ' //.And. SX3->X3_BROWSE == "S"
+			nX++
+			IF SX3->X3_BROWSE == "S"
+				aadd(aColunas,EscpJsonStr( cValToChar(AllTrim( (AliaseDici)->X3_CAMPO) )))
+				aadd(aTitulos,EscpJsonStr( cValToChar(AllTrim( (AliaseDici)->X3_TITULO) )))
+			Endif
+			dbSelectArea("SX3")
+			dbSkip()
+		EndDo
+	
+		IF Len(aColunas) > 0
+		
+			aaDados	:= Array(#)
+
+			cQuery := "SELECT "
+			For nST := 1 To Len(aColunas)
+				cQuery += cValToChar(AllTrim(aColunas[nST]))
+				IF nST < Len(aColunas)
+					cQuery += ","
+				ENDIF
+			Next nST
+		//::cRetorno := cQuery    
+	                            
+			cQuery += " FROM "+RetSqlName(::Alias)+" C "
+			cQuery += " INNER JOIN "+RetSqlName("AI4")+" A "
+			cQuery += " ON A.AI4_CODCLI = C.A1_COD "
+			cQuery += " WHERE A.AI4_CODUSU = '"+::UserCode+"'"
+		
+			nX:=1
+		
+		// Executa a busca
+			cQuery := ChangeQuery(cQuery)
+			dbUseArea(.T.,"TOPCONN",TcGenQry(,,cQuery),cAliasAI4)
+			While !(cAliasAI4)->(Eof())
+				aaDados[#(cValToChar(nX))] := Array(#)
+				For nSTB := 1 To Len(aColunas)
+					aaDados[#(cValToChar(nX))][#(cValToChar(nSTB))] := Array(#)
+					aaDados[#(cValToChar(nX))][#(cValToChar(nSTB))][#'Coluna'] 	:= EscpJsonStr(cValToChar(AllTrim( aColunas[nSTB] )))
+					aaDados[#(cValToChar(nX))][#(cValToChar(nSTB))][#'Valor'] 	:= EscpJsonStr(cValToChar(AllTrim( (cAliasAI4)->&(aColunas[nSTB]) )))
+					aaDados[#(cValToChar(nX))][#(cValToChar(nSTB))][#'Titulo'] 	:= EscpJsonStr(cValToChar(AllTrim( aTitulos[nSTB] )))
+				Next nSTB
+				nX++
+				dbSelectArea(cAliasAI4)
+				dbSkip()
+			EndDo
+			::cRetorno := ToJson(aaDados)
+		
+	    //::cRetorno := cQuery		
+		Else
+			SetSoapFault("Colunas inválidas"," O total de colunas é: "+cValToChar(Len(aColunas)))
+			lRetorno := .F.
+		Endif
+	Else
+		lRetorno := .F.
+	EndIf
+	RestArea(aArea)
+Return(lRetorno)
+
+                  
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSCadastrese #Autor: Alexandre Sette #Data: 20.12.2013 	 ++
+++===========================================================================++
+++ Descrição: | Cadastra um novo cliente/usuário no protheus				 ++
+++            | 					 	                                 	 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| cDadosJson, cRetorno                                       	 ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSCadastrese WSRECEIVE cDadosJson WSSEND cRetorno WSSERVICE WSSEMAR
+	Local aArea 		:= getArea()
+	Local lRetorno 		:= .T.
+	Local cAlias		:= "AI3"
+	Local aaMsgRetorno	:= Array(#)
+	Local lResultBusca	:= .T.
+	Local cCPF			:= NIL
+	Local cCNPJ			:= NIL
+	Local cLOGIN		:= NIL
+	Local cColuna		:= NIL
+	Local nTpOper		:= 1
+	Local cCodUsu		:= NIL
+	Local cQuery		:= ""
+    
+	aaDadosJson := FromJson(cDadosJson)
+	// Seleciona o alias
+	DbSelectArea(cAlias)
+	// Seta a ordem do indice (CPF,CNPJ,LOGIN)
+	AI3->(dbSetOrder(4))
+	
+	// Busca os dados na string json para adicionar na pesquisa do indice
+	For nY := 1 To Len(aaDadosJson)
+		cColuna := AllTrim(aaDadosJson[nY][#'Coluna'])
+		IF cColuna == "AI3_CPF"
+			cCPF 	:= AllTrim(aaDadosJson[nY][#'Valor'])
+		ENDIF
+	Next nY
+	// Seta valores para busca no Aliases          cValToChar(cCPF) == "111111111111"
+	//lResultBusca := AI3->(dbSeek(xFilial(cAlias)+cValToChar(cCPF)))
+	cCPF:= posicione(cAlias,4, xfilial(cAlias) + cValToChar(cCPF), "AI3_CPF")
+	// Verifica se existe o registro
+	// Caso exista verifica o status atual do registro
+	IF !empty(cCPF) .And. (cAlias)->AI3_ADMIN == "2" // 2 = usuário comum, 1 = Administrador
+		IF (cAlias)->AI3_LOGIN <> " " .And. (cAlias)->AI3_PSW <> " "
+			aaMsgRetorno[#'msg'] := "ativado"
+		ELSE
+			aaMsgRetorno[#'msg'] := "aguardandoaprovacao"
+		ENDIF
+	ELSE
+		// Pega o proximo registro CODUSU		
+		cCodUsu := u_smgetSeq("AI3","AI3_CODUSU")
+		// Cadastra novo usuário
+		RecLock(cAlias,.T.)
+		AI3->AI3_FILIAL := xFilial("AI3")
+		AI3->AI3_CODUSU := cCodUsu
+		For nX := 1 To Len(aaDadosJson)
+			(cAlias)->&(aaDadosJson[nX][#'Coluna']) := aaDadosJson[nX][#'Valor']
+		Next nX
+		(cAlias)->(MsUnlock())
+			
+		aaMsgRetorno[#'msg'] 	:= "sucesso"
+		aaMsgRetorno[#'codusu'] := cCodUsu
+		
+		
+	ENDIF
+	::cRetorno := ToJson(aaMsgRetorno)
+	RestArea(aArea)
+Return (lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSEmailsAuditores #Autor: Alexandre Sette #Data: 20.12.2013 ++
+++===========================================================================++
+++ Descrição: | Retorna a lista de Nome/E-mail dos auditores				 ++
+++            | 					 	                                 	 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| cDadosJson                                               	 ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSEmailsAuditores WSRECEIVE NULLPARAM WSSEND rDadosAuditores WSSERVICE WSSEMAR
+
+	Local aArea    := GetArea()
+	Local lRetorno := .T.
+	Local nX       := 0
+
+	dbSelectArea("AI3")
+	dbSetOrder(1)
+	//MsSeek(::Alias)
+	nX := 0
+	While !Eof()
+		IF AI3_ADMIN == "1" .And. AI3->AI3_EMAIL <> " "
+			nX++
+			aadd(::rDadosAuditores,WSClassNew("eDadosAuditores"))
+			::rDadosAuditores[nX]:cNome		:= AI3->AI3_NOME
+			::rDadosAuditores[nX]:cEmail	:= AI3->AI3_EMAIL
+		ENDIF
+		dbSelectArea("AI3")
+		dbSkip()
+	EndDo
+	RestArea(aArea)
+Return(lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSGetDadosAtivacao #Autor: Alexandre Sette #Data: 08.01.2014++
+++===========================================================================++
+++ Descrição: | Busca na tabela AI3 os dados cadastrado no formulario cadas  ++
+++            | tre-se, com objetivo de validar os dados informados.		 ++ 
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, CODUSU ( Codigo ou ID do novo usuário )            ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSGetDadosAtivacao WSRECEIVE UserCode,CODUSU WSSEND cRetorno WSSERVICE WSSEMAR
+
+	Local aArea    	:= GetArea()
+	Local cAlias	:= "AI3"
+	Local lRetorno 	:= .T.
+	Local aColunas	:= {}
+
+	If PrtChkUser(::UserCode,"WSSEMAR","WSGetDadosDicionario")
+	// Seleciona o "Base de dados" ( Tabela )
+		dbSelectArea(cAlias)
+	// Seleciona o Indice do "Alias"
+		dbSetOrder(1)
+		dbSeek(xFilial("AI3")+::CODUSU)
+	// Setando as colunas do Alias
+		aColunas := DbStruct()
+		nX := 1
+		aaDados	:= Array(#)
+		IF FOUND()
+			While !Eof()
+				IF (cAlias)->AI3_CODUSU == ::CODUSU
+					aaDados[#(cValToChar(nX))] := Array(#)
+					For nST := 1 To Len(aColunas)
+						aaDados[#(cValToChar(nX))][#(cValToChar(nST))] := Array(#)
+				   	//aaDados[#(cValToChar(nX))][#(cValToChar(aColunas[nST][1]))] := EscpJsonStr(cValToChar(AllTrim((cAlias)->&(aColunas[nST][1]))))  
+						aaDados[#(cValToChar(nX))][#(cValToChar(nST))][#'Coluna'] := EscpJsonStr(cValToChar(AllTrim(aColunas[nST][1])))
+						aaDados[#(cValToChar(nX))][#(cValToChar(nST))][#'Valor'] := EscpJsonStr(cValToChar(AllTrim((cAlias)->&(aColunas[nST][1]))))
+				   	//aaDados[#(cValToChar(aColunas[nST][1]))] := EscpJsonStr(cValToChar(AllTrim((cAlias)->&(aColunas[nST][1]))))
+					//::cRetorno +=  cValToChar(nX)+" " +cValToChar(aColunas[nST][1])+ " => "+cValToChar((cAlias)->&(aColunas[nST][1]))+"\n"
+					//::cRetorno += "AA"				
+					
+					Next nST
+					nX++
+				ENDIF
+				dbSelectArea(cAlias)
+				dbSkip()
+			Enddo
+		ELSE
+			aaDados[#'msg'] := "naolocalizado"
+		ENDIF
+	
+		::cRetorno := ToJson(aaDados)
+   //	::cRetorno := "ALEXANDRE # "+cAlias+" Total de Colunas "+cValToChar(Len(aColunas))
+	Else
+		lRetorno := .F.
+	EndIf
+	RestArea(aArea)
+Return(lRetorno)
+     
+                 
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSAtivaCadastro #Autor: Alexandre Sette #Data: 08.01.2014   ++
+++===========================================================================++
+++ Descrição: | Busca na tabela AI3 os dados cadastrado no formulario cadas  ++
+++            | tre-se, com objetivo de ativar o login e senha.		 		 ++ 
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, CODUSU ( Codigo ou ID do novo usuário )            ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSAtivaCadastro WSRECEIVE UserCode,CODUSU WSSEND cRetorno WSSERVICE WSSEMAR
+
+	Local aArea    	:= GetArea()
+	Local cAlias	:= "AI3"
+	Local lRetorno 	:= .T.
+	Local aColunas	:= {}
+	Local cLogin	:= ""
+	Local cPSW		:= ""
+	Local cLogin2	:= ""
+	Local cPSW2		:= ""
+	Local cNome		:= ""
+	Local cEmail	:= ""
+	Local cCNPJCPF	:= ""
+	Local cTipo		:= ""
+	Local cCodCli	:= ""
+	Local cLojCli	:= ""
+	Local aaMsgRetorno	:= Array(#)
+
+	If PrtChkUser(::UserCode,"WSSEMAR","WSAtivaCadastro")
+	// Seleciona o "Base de dados" ( Tabela )
+		dbSelectArea(cAlias)
+	// Seleciona o Indice do "Alias"
+		dbSetOrder(1)
+		dbSeek(xFilial("AI3")+::CODUSU)
+		IF (cAlias)->AI3_CODUSU == ::CODUSU
+			cLogin 	:= AllTrim((cAlias)->AI3_LOGIN)
+			cPSW 	:= AllTrim((cAlias)->AI3_PSW)
+			cLogin2 := AllTrim((cAlias)->AI3_LOGIN2)
+			cPSW2 	:= AllTrim((cAlias)->AI3_PSW2)
+			cNome	:= AllTrim((cAlias)->AI3_NOME)
+			cEmail	:= AllTrim((cAlias)->AI3_EMAIL)
+			cCNPJCPF:= AllTrim((cAlias)->AI3_CNPJ)
+			cTipo	:= AllTrim((cAlias)->AI3_YTIPO)
+			IF FOUND()
+			// VALIDACAO
+			// 1ª Verifica se existe Empresa para o CNPJ/CPF informado no cadastro.
+				// Verifica se o cadastro é de cliente ou fornecedor
+				IF cValToChar(cTipo) == "C"
+					dbSelectArea("SA1")
+					dbSetOrder(3)
+					dbSeek(xFilial("SA1")+cValToChar(AllTrim(cCNPJCPF)))
+				ELSEIF cValToChar(cTipo) == "F"
+					dbSelectArea("SA2")
+					dbSetOrder(3)
+					dbSeek(xFilial("SA2")+cValToChar(AllTrim(cCNPJCPF)))
+				ELSE
+					dbSelectArea("SA1")
+					dbSetOrder(3)
+					dbSeek(xFilial("SA1")+cValToChar(AllTrim(cCNPJCPF)))
+				ENDIF
+				IF FOUND()
+			     // Salva Código do cliente é Código da loja
+					cCodCli		:= cValToChar(AllTrim(SA1->A1_COD))
+					cLojCli	:= cValToChar(AllTrim(SA1->A1_LOJA))
+				 // 2ª Verifica se já foi feito a ativação do cadastro.
+					IF empty(cLogin) .And. empty(cPSW)
+					 // 3ª Verifica se no cadastro o "Cliente" adicionou usuário é senha corretamete.
+						IF !empty(cLogin2) .And. !empty(cPSW2)
+						// Ativa o cadastro
+							RECLOCK("AI3", .F.)
+							AI3->AI3_LOGIN 	:= cLogin2
+							AI3->AI3_PSW 	:= cPSW2
+							(cAlias)->(MsUnlock())
+							aaMsgRetorno[#'msg'] 	:= "sucesso"
+							aaMsgRetorno[#'nome'] 	:= cNome
+							aaMsgRetorno[#'email'] 	:= cEmail
+				   		// Habilitar Cliente para o usuário AI4->(Ai3+SA1)
+							RECLOCK("AI4", .T.)
+							AI4->AI4_FILIAL := xFilial("AI4")
+							AI4->AI4_CODUSU	:= ::CODUSU
+							AI4->AI4_CODCLI := cCodCli
+							AI4->AI4_LOJCLI := cLojCli
+							AI4->(MsUnlock())
+				   		// Habilitar WebService WSSEMAR (Cadastrar)
+							RECLOCK("AI6", .T.)
+							AI6->AI6_FILIAL := xFilial("AI6")
+							AI6->AI6_CODUSU	:= ::CODUSU
+							AI6->AI6_WEBSRV	:= "WSSEMAR"
+							AI6->(MsUnlock())
+						ELSE
+							aaMsgRetorno[#'msg'] := "errorusuariosenha"
+						ENDIF
+					ELSE
+						aaMsgRetorno[#'msg'] := "jacadastrado"
+					ENDIF
+				ELSE
+					aaMsgRetorno[#'msg'] := "empresanaoencontrada"
+				ENDIF
+			ENDIF
+		ENDIF
+		::cRetorno := ToJson(aaMsgRetorno)
+   	//::cRetorno := "LOGIN # "+cLogin+" SENHA # "+cPSW +" CODUSU # "+::CODUSU +" FILIAL # "+xFilial("AI3")
+	Else
+		lRetorno := .F.
+	EndIf
+	RestArea(aArea)
+Return(lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSCancelarCadastro #Autor: Alexandre Sette #Data: 09.01.2014 ++
+++===========================================================================++
+++ Descrição: | Busca na tabela AI3 os dados cadastrado no formulario cadas  ++
+++            | tre-se, com objetivo de ativar o login e senha.		 		 ++ 
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, CODUSU ( Codigo ou ID do novo usuário )            ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSCancelarCadastro WSRECEIVE UserCode,CODUSU WSSEND cRetorno WSSERVICE WSSEMAR
+
+	Local aArea    	:= GetArea()
+	Local cAlias	:= "AI3"
+	Local lRetorno 	:= .T.
+	Local aColunas	:= {}
+	Local cLogin	:= ""
+	Local cPSW		:= ""
+	Local cLogin2	:= ""
+	Local cPSW2		:= ""
+	Local cNome		:= ""
+	Local cEmail	:= ""
+	Local aaMsgRetorno	:= Array(#)
+
+	If PrtChkUser(::UserCode,"WSSEMAR","WSAtivaCadastro")
+	// Seleciona o "Base de dados" ( Tabela )
+		dbSelectArea(cAlias)
+	// Seleciona o Indice do "Alias"
+		dbSetOrder(1)
+		dbSeek(xFilial("AI3")+::CODUSU)
+		IF FOUND()
+			IF (cAlias)->AI3_CODUSU == ::CODUSU
+			// Carrega variaveis 
+				cLogin 	:= AllTrim((cAlias)->AI3_LOGIN)
+				cPSW 	:= AllTrim((cAlias)->AI3_PSW)
+				cLogin2 := AllTrim((cAlias)->AI3_LOGIN2)
+				cPSW2 	:= AllTrim((cAlias)->AI3_PSW2)
+				cNome 	:= AllTrim((cAlias)->AI3_NOME)
+				cEmail 	:= AllTrim((cAlias)->AI3_EMAIL)
+			// VALIDACAO
+			 // 1ª Verifica se já foi feito a ativação do cadastro.
+				IF empty(cLogin) .And. empty(cPSW)
+				// Não foi feito ativação ainda :-(
+				// Exclui ( Logicamente ) o cadastro
+					RECLOCK("AI3", .F.)
+					dbDelete()
+					(cAlias)->(MsUnlock())
+					aaMsgRetorno[#'msg'] 	:= "sucesso"
+					aaMsgRetorno[#'nome'] 	:= cNome
+					aaMsgRetorno[#'email'] 	:= cEmail
+				ELSE
+					aaMsgRetorno[#'msg'] := "jacadastrado"
+				ENDIF
+			ENDIF
+		ENDIF
+		::cRetorno := ToJson(aaMsgRetorno)
+   	//::cRetorno := "LOGIN # "+cLogin+" SENHA # "+cPSW +" CODUSU # "+::CODUSU +" FILIAL # "+xFilial("AI3")
+	Else
+		lRetorno := .F.
+	EndIf
+	RestArea(aArea)
+Return(lRetorno)
+
+  
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSConsultaEmpresa #Autor: Alexandre Sette #Data: 09.01.2014 ++
+++===========================================================================++
+++ Descrição: | Busca na tabela AI3 os dados cadastrado no formulario cadas  ++
+++            | tre-se, com objetivo de ativar o login e senha.		 		 ++ 
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, CODUSU ( Codigo ou ID do novo usuário )            ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++  
+*/
+	WSMETHOD WSConsultaEmpresa WSRECEIVE UserCode,cCNPJCPF, cTipo WSSEND cRetorno WSSERVICE WSSEMAR
+
+	Local aArea    	:= GetArea()
+	Local cAlias	:= "SA1" // Cliente
+	Local cAlias2	:= "SA2" // Fornecedor
+	Local lRetorno 	:= .T.
+	Local aColunas	:= {}
+	Local aaMsgRetorno	:= Array(#)
+
+	If PrtChkUser(::UserCode,"WSSEMAR","WSConsultaEmpresa")
+	// Para Cliente
+	IF cValToChar(AllTrim(::cTipo)) == "C"
+   		// Seleciona o "Base de dados" ( Tabela )
+		dbSelectArea(cAlias)
+   		// Seleciona o Indice do "Alias"
+		dbSetOrder(3)
+		dbSeek(xFilial(cAlias)+cValToChar(AllTrim(::cCNPJCPF)))
+		IF FOUND()
+			IF (cAlias)->A1_CGC == ::cCNPJCPF
+				aaMsgRetorno[#'A1_NOME'] 	:= AllTrim(SA1->A1_NOME)
+				aaMsgRetorno[#'A1_NREDUZ'] 	:= AllTrim(SA1->A1_NREDUZ)
+				aaMsgRetorno[#'A1_CGC'] 	:= AllTrim(SA1->A1_CGC)
+				aaMsgRetorno[#'A1_END'] 	:= AllTrim(SA1->A1_END)
+				aaMsgRetorno[#'A1_EST'] 	:= AllTrim(SA1->A1_EST)
+				aaMsgRetorno[#'A1_MUN'] 	:= AllTrim(SA1->A1_MUN)
+				aaMsgRetorno[#'A1_BAIRRO'] 	:= AllTrim(SA1->A1_BAIRRO)
+				aaMsgRetorno[#'A1_CEP'] 	:= AllTrim(SA1->A1_CEP)
+				aaMsgRetorno[#'A1_DDD'] 	:= AllTrim(SA1->A1_DDD)
+				aaMsgRetorno[#'A1_TEL'] 	:= AllTrim(SA1->A1_TEL)
+			ENDIF
+		ENDIF
+	// Para fornecedor
+	ELSEIF cValToChar(AllTrim(::cTipo)) == "F"
+		// Seleciona o "Base de dados" ( Tabela )
+		dbSelectArea(cAlias2)
+   		// Seleciona o Indice do "Alias"
+		dbSetOrder(3)
+		dbSeek(xFilial(cAlias2)+cValToChar(AllTrim(::cCNPJCPF)))
+		IF FOUND()
+			IF (cAlias2)->A2_CGC == ::cCNPJCPF
+				aaMsgRetorno[#'A2_NOME'] 	:= AllTrim(SA2->A2_NOME)
+				aaMsgRetorno[#'A2_NREDUZ'] 	:= AllTrim(SA2->A2_NREDUZ)
+				aaMsgRetorno[#'A2_CGC'] 	:= AllTrim(SA2->A2_CGC)
+				aaMsgRetorno[#'A2_END'] 	:= AllTrim(SA2->A2_END) 
+				aaMsgRetorno[#'A2_NR_END']  := AllTrim(SA2->A2_NR_END) 
+				aaMsgRetorno[#'A2_EST'] 	:= AllTrim(SA2->A2_EST)
+				aaMsgRetorno[#'A2_MUN'] 	:= AllTrim(SA2->A2_MUN)
+				aaMsgRetorno[#'A2_BAIRRO'] 	:= AllTrim(SA2->A2_BAIRRO)
+				aaMsgRetorno[#'A2_CEP'] 	:= AllTrim(SA2->A2_CEP)
+				aaMsgRetorno[#'A2_DDD'] 	:= AllTrim(SA2->A2_DDD)
+				aaMsgRetorno[#'A2_TEL'] 	:= AllTrim(SA2->A2_TEL)
+			ENDIF
+		ENDIF
+	ELSE
+		::cRetorno := Nil
+	ENDIF
+		
+		::cRetorno := ToJson(aaMsgRetorno)
+	
+   	//::cRetorno := "LOGIN # "+cLogin+" SENHA # "+cPSW +" CODUSU # "+::CODUSU +" FILIAL # "+xFilial("AI3")
+	Else
+		lRetorno := .F.
+	EndIf
+	RestArea(aArea)
+Return(lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSDicionarioConsulEmp #Autor: Alexandre Sette #Data: 20.12.2013 ++
+++===========================================================================++
+++ Descrição: | Retona os campos do alias passado por parametro				 ++
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, ALIAS                                              ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSDicionarioConsulEmp WSRECEIVE UserCode,Alias WSSEND rDadosDici WSSERVICE WSSEMAR
+
+	Local aArea    := GetArea()
+	Local lRetorno := .T.
+	Local nX       := 0
+	Local aCampos  := {}
+	Local cX3CAMPO := NIL
+
+	If PrtChkUser(::UserCode,"WSSEMAR","WSDicionarioConsulEmp")
+		dbSelectArea("SX3")
+		dbSetOrder(1)
+		dbSeek(::Alias)
+		nX := 0
+		aCampos := {"A1_NOME","A1_NREDUZ","A1_CGC","A1_END","A1_EST","A1_MUN","A1_BAIRRO","A1_CEP","A1_DDD","A1_TEL"}
+		While !Eof()
+			cX3CAMPO := cValToChar(AllTrim(SX3->X3_CAMPO))
+			bSeek 			:= {|x| x == cX3CAMPO}
+			cRetornoBusca 	:= cValToChar(aScan(aCampos,bSeek))
+			IF cRetornoBusca <> "0"
+				nX++
+				aadd(::rDadosDici,WSClassNew("eDicionario"))
+				//::rGenStrDados[nX]:Code         := SixDescricao()
+				//::rGenStrDados[nX]:Description  := SIX->CHAVE 
+				::rDadosDici[nX]:TituloCampo	:= X3Titulo()
+				::rDadosDici[nX]:Alias     		:= SX3->X3_ARQUIVO
+				::rDadosDici[nX]:IdCampo    	:= cX3CAMPO
+				::rDadosDici[nX]:TipoCampo   	:= SX3->X3_TIPO
+				::rDadosDici[nX]:TamanhoCampo	:= cValToChar(SX3->X3_TAMANHO)
+				::rDadosDici[nX]:CampoDecimal	:= cValToChar(SX3->X3_DECIMAL)
+				::rDadosDici[nX]:OrdemCampo		:= SX3->X3_ORDEM
+				::rDadosDici[nX]:Obrigatorio	:= SX3->X3_OBRIGAT == Chr( 128 )
+				::rDadosDici[nX]:Mascara 		:= SX3->X3_PICTURE
+				::rDadosDici[nX]:Validacao  	:= SX3->X3_VALID
+				::rDadosDici[nX]:LookUp      	:= SX3->X3_F3
+				::rDadosDici[nX]:UserComboBox	:= X3CBox()
+				::rDadosDici[nX]:Aba			:= SX3->X3_FOLDER
+				::rDadosDici[nX]:Altera			:= SX3->X3_VISUAL
+			ENDIF
+			dbSelectArea("SX3")
+			dbSkip()
+		EndDo
+	Else
+		lRetorno := .F.
+	EndIf
+	RestArea(aArea)
+Return(lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSTrocarSenha #Autor: Alexandre Sette #Data: 20.12.2013 	 ++
+++===========================================================================++
+++ Descrição: | Atualiza a senha do usuário									 ++
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, PSW_OLD, PSW_NEW                                   ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSTrocarSenha WSRECEIVE UserCode,cPSW_OLD,cPSW_NEW WSSEND cRetorno WSSERVICE WSSEMAR
+// Declarações
+	Local aArea    := GetArea()
+	Local lRetorno := .T.
+	Local aaMsgRetorno	:= Array(#)
+// Checando se o usuário tem acesso ao webservice
+	If PrtChkUser(::UserCode,"WSSEMAR","WSTrocarSenha")
+		dbSelectArea("AI3")
+		dbSetOrder(1)
+		dbSeek(xFilial("AI3")+::UserCode)
+		IF FOUND()
+			IF cValToChar(AllTrim(AI3->AI3_PSW)) == cValToChar(AllTrim(::cPSW_OLD))
+		  // Atualiza para nova senha
+				RECLOCK("AI3", .F.)
+				AI3->AI3_PSW 	:= cValToChar(AllTrim(::cPSW_NEW))
+				AI3->(MsUnlock())
+				aaMsgRetorno[#'msg'] := "sucesso"
+			ELSE
+				aaMsgRetorno[#'msg'] := "senhaantiganaoconfere"
+			ENDIF
+		ELSE
+			aaMsgRetorno[#'msg'] := "usuarionaoencontrato"
+		ENDIF
+		::cRetorno := ToJson(aaMsgRetorno)
+	Else
+		lRetorno := .F.
+	EndIf
+	RestArea(aArea)
+Return(lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSUpdateMeuCadPessoal #Autor: Alexandre Sette #Data: 17.01.2014++
+++===========================================================================++
+++ Descrição: | Atualiza a senha do usuário									 ++
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, PSW_OLD, PSW_NEW                                   ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSUpdateMeuCadPessoal WSRECEIVE UserCode,cDadosJson WSSEND cRetorno WSSERVICE WSSEMAR
+	Local aArea 		:= getArea()
+	Local lRetorno 		:= .T.
+	Local cAlias		:= "AI3"
+	Local aaMsgRetorno	:= Array(#)
+	Local lResultBusca	:= .T.
+	Local cNOME			:= NIL
+	Local cEMAIL		:= NIL
+	Local cCPF			:= NIL
+	Local cColuna		:= NIL
+	Local nTpOper		:= 1
+	Local cCodUsu		:= NIL
+
+	If PrtChkUser(::UserCode,"WSSEMAR","WSUpdateMeuCadPessoal")
+		aaDadosJson := FromJson(cDadosJson)
+	// Seleciona o alias
+		DbSelectArea(cAlias)
+	// Seta a ordem do indice (FILIAL,CODUSU)
+		dbSetOrder(1)
+	// Busca os dados na string json. Por segurança não é permitido o update dinamico
+		For nY := 1 To Len(aaDadosJson)
+			cColuna := aaDadosJson[nY][#'Coluna']
+			IF cColuna == "AI3_NOME"
+				cNOME 	:= aaDadosJson[nY][#'Valor']
+			ENDIF
+			IF cColuna == "AI3_EMAIL"
+				cEMAIL 	:= aaDadosJson[nY][#'Valor']
+			ENDIF
+			IF cColuna == "AI3_CPF"
+				cCPF 	:= aaDadosJson[nY][#'Valor']
+			ENDIF
+		Next nY
+	// Seta valores para busca no Aliases
+		lResultBusca := dbSeek(xFilial("AI3")+::UserCode)
+	// Verifica se existe o registro
+	// Caso exista (usuario) verifica o status atual do registro, se é apenas usuário :)
+		IF lResultBusca .And. (cAlias)->AI3_ADMIN == "2"
+			RecLock(cAlias,.F.)
+			AI3->AI3_NOME 	:= cNOME
+			AI3->AI3_EMAIL 	:= cEMAIL
+			AI3->AI3_CPF 	:= cCPF
+			(cAlias)->(MsUnlock())
+			aaMsgRetorno[#'msg'] 	:= "sucesso"
+		ELSE
+			aaMsgRetorno[#'msg'] 	:= "naoepossivelatualizar"
+		ENDIF
+		::cRetorno := ToJson(aaMsgRetorno)
+	ELSE
+		lRetorno := .F.
+	EndIf
+	 
+	RestArea(aArea)
+Return (lRetorno)
+              
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSConsultaCotacoes #Autor: Alexandre Sette #Data: 20.01.2014++
+++===========================================================================++
+++ Descrição: | Consulta SC1 
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, PSW_OLD, PSW_NEW                                   ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSConsultaCotacoes WSRECEIVE UserCode WSSEND cRetorno WSSERVICE WSSEMAR
+
+// Definição de variáveis
+	Local aArea 		:= getArea()
+	Local lRetorno 		:= .T.
+	Local cAlias		:= "SC1"
+	Local cSuperior		:= ""
+	Local cMailSup		:= ""
+	Local cNumSc 		:= ""
+	Local cMsgInf       := ""
+	Local cNome 		:= ""
+	Local cUser 		:= ""
+	Local _cEmpre 		:= AllTrim(sm0->m0_nome)+" / "+AllTrim(sm0->m0_filial)
+	Local aDadosUsuario := {}
+	Local aSupervisor	:= {}
+	Local cNomeSup		:= ""
+	Local cUsrSup		:= ""
+	Local cSql			:= ""
+	Local aaMsgRetorno	:= Array(#)
+
+
+// Valida Usuário
+	IF PrtChkUser(::UserCode,"WSSEMAR","WSConsultaCotacoes")
+
+	// 1ª Parte pega a proxima cotação gerada e não enviado ( C1_ENVIADO = ' ' )
+		cSql := "SELECT TOP 1 C1_FILIAL, C1_NUM, C1_USER, C1_ENVIADO, C1_OBS "
+		cSql += "FROM "+RetSqlName(cAlias)
+		cSql += " WHERE D_E_L_E_T_ = ' ' AND C1_ENVIADO = ' '"
+		cSql += " AND C1_FILIAL = '" +xFilial(cAlias)+ "'"
+		cSql += " GROUP BY C1_FILIAL, C1_NUM, C1_USER, C1_ENVIADO, C1_OBS"
+		cSql += " ORDER BY C1_NUM"
+	// Verifica se esta aberto o Aliase
+		IF Select("QryCOT") > 0
+			dbSelectArea("QryCOT")
+			QryCOT->(DbCloseArea())
+		ENDIF
+		TcQuery cSql New Alias "QryCOT"
+	// Definindo o cUser ( Código do usuário que fez a solicitação de cotação )
+		cUser 	:= QryCOT->C1_USER
+	// Definando numero da solicitação de cotação
+		cNumSc	:= QryCOT->C1_NUM
+	
+	// 2ª Parte pega dados da SC1 ( Solicitação de Cotação )
+		IF PswSeek(cUser,.T.)  // .T. para usuários e .F. para grupos
+			aDadosUsuario 	:= PswRet()
+			cSuperior 		:= aDadosUsuario[1][11] // Dados do Superior do usuário passado no Pswseek!
+			cNome 			:= aDadosUsuario[1][2] // Nome do usuário passado no PswSeek
+			aSupervisor		:= StrToKarr(cValToChar(AllTrim(cSuperior)),"|")
+			nTotalSupervi	:= Len(aSupervisor)
+			ConOut( "---------------------------[WORFLOW-SETTE]---------------------------" )
+			ConOut( "[WORFLOW-SETTE] Total de Supervisores 				["+cValToChar(nTotalSupervi)+"]" )
+			For nI := 1 To nTotalSupervi
+				aaMsgRetorno[#(cValToChar(nI))] := Array(#)
+			// Código do usuário do supervidor
+				cUsrSup 	:= aSupervisor[nI]
+				aaMsgRetorno[#(cValToChar(nI))][#'USER'] 		:= cUser
+				aaMsgRetorno[#(cValToChar(nI))][#'NUMSC'] 		:= cNumSc
+				aaMsgRetorno[#(cValToChar(nI))][#'EMPRESA']		:= _cEmpre
+				aaMsgRetorno[#(cValToChar(nI))][#'NOMESOLI']	:= Alltrim(cNome)
+				aaMsgRetorno[#(cValToChar(nI))][#'SUPNOME']		:= Alltrim(UsrFullName(cUsrSup))
+				aaMsgRetorno[#(cValToChar(nI))][#'SUPEMAIL']	:= Alltrim(UsrRetMail(cUsrSup))
+			
+			//cNomeSup	:= Alltrim(UsrFullName(cUsrSup))
+			//cMailSup 	:= Alltrim(UsrRetMail(cUsrSup))
+			//cMsgInf 	:= _cEmpre+" Solicitação  de Compra : " + cNumSc + ". Foi enviada para aprovação. Cód.Sup => "+cNomeSup+" cMailSup => "+cMailSup		
+			Next
+		ENDIF
+		::cRetorno := ToJson(aaMsgRetorno)
+	//::cRetorno := cUser
+	
+	ELSE // IF PrtChkUser
+		lRetorno := .F.
+	ENDIF
+	RestArea(aArea)
+Return (lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSUpdateEnvioCotacoes #Autor: Alexandre Sette #Data: 20.01.2014++
+++===========================================================================++
+++ Descrição: | Consulta SC1 
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, PSW_OLD, PSW_NEW                                   ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSUpdateEnvioCotacoes WSRECEIVE UserCode,cNUMSC,cDATAHORA WSSEND cRetorno WSSERVICE WSSEMAR
+
+// Definição de variáveis
+	Local aArea 		:= getArea()
+	Local lRetorno 		:= .T.
+	Local cAlias		:= "SC1"
+	Local cSql			:= ""
+	Local aaMsgRetorno	:= Array(#)
+
+
+// Valida Usuário
+	IF PrtChkUser(::UserCode,"WSSEMAR","WSUpdateEnvioCotacoes")
+
+	// 1ª Parte pega a proxima cotação gerada e não enviado ( C1_ENVIADO = ' ' )
+		cSql := "UPDATE "+RetSqlName(cAlias)
+		cSql += " SET C1_ENVIADO='"+::cDATAHORA+"'"
+		cSql += " WHERE D_E_L_E_T_ = ' ' AND C1_FILIAL = '"+xFilial(cAlias)+"' AND C1_NUM='"+::cNUMSC+"'"
+	// Verifica se esta aberto o Aliase
+		IF (TCSQLExec(cSql) < 0)
+			aaMsgRetorno[#'msg'] := TCSQLError()
+			ConOut( "[SEMAR - CONFIRMAÇÃO DE ENVIO] -  ATUALIZANDO DATA HORA ENVIO SC1... ERROR :" + TCSQLError()  )
+		Else
+			aaMsgRetorno[#'msg'] := "sucesso"
+			ConOut( "[SEMAR - CONFIRMAÇÃO DE ENVIO] -  ATUALIZANDO DATA HORA ENVIO SC1... OK! " )
+			TCRefresh(RETSQLNAME(cAlias))
+		EndIF
+
+		::cRetorno := ToJson(aaMsgRetorno)
+	//::cRetorno := cUser
+	
+	ELSE // IF PrtChkUser
+		lRetorno := .F.
+	ENDIF
+	RestArea(aArea)
+Return (lRetorno)
+
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSDadosSolicitacaoCompra #Autor: Alexandre Sette #Data: 22.01.2014++
+++===========================================================================++
+++ Descrição: | Consulta SC1 e retorna dados da SC e tbm resumo de 60 dias 	 ++
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| USERCODE, PSW_OLD, PSW_NEW                                   ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+	WSMETHOD WSDadosSolicitacaoCompra WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVICE WSSEMAR
+// Definição de variáveis
+	Local aArea 		:= getArea()
+	Local lRetorno 		:= .T.
+	Local cAliasSC1		:= "SC1" 			
+	Local cQuery		:= ""
+
+// Variaveis da SC
+	Local _cEmpre 		:= "" // EMPRESA/FILIAL QUE DA SOLICITAÇÃO DE COMPRA
+	Local cNumSc 		:= "" // NUMERO DA SOLICITAÇÃO DE COMPRA
+	Local cUser 		:= "" // USUÁRIO QUE CRIOU A SOLICITACAO DE COMPRA
+	Local cNome 		:= "" // NOME DO USUARIO QUE CRIOU A SOLICITACAO DE COMPRA
+	Local cNomeSup		:= "" // NOME DO SUPERIOR DO USUARIO QUE ABRIU A SOLICITACAO DE COMPRA
+	Local cMailSup		:= "" // EMAIL DO SUPERIOR DO USUARIO QUE ABRIU A SOLICITACAO DE COMPRA
+	Local cSuperior		:= "" // CODIGOS DO SUPERVISORES DE QUE ABRIU A SOLICITACAO DE COMPRA ( cUser )
+	Local cEMISSAO		:= "" // Data de emissão da solicitação de compra
+	Local cSITUACAO		:= ""
+
+	Local cMsgInf       := ""
+	Local aDadosUsuario := {}
+	Local aSupervisor	:= {}
+
+	Local cUsrSup		:= ""
+	Local cSql			:= ""
+
+	Local cPictQuant:=AvSx3("D1_QUANT",6)
+	Local cPictVlrUn:=AvSx3("D1_VUNIT",6)
+	Local cPictVlrTo:=AvSx3("D1_TOTAL",6)
+	Local __CONNECT := "TOPCONN"
+
+// ARRAY JSON DE RETORNO
+	Local aaMsgRetorno	:= Array(#)
+
+
+// Valida Usuário
+	IF PrtChkUser(::UserCode,"WSSEMAR","WSDadosSolicitacaoCotacao")
+
+// 1ª Listar o dados da SC1 filtando pelo numero da solicitação ::cNUMSC	
+		cAlias := GetNextAlias()
+		cQuery := "SELECT * FROM "+RetSqlName(cAliasSC1)+" WHERE C1_NUM='"+::cNUMSC+"' AND C1_FILIAL = '" + xFilial(cAliasSC1) + "' AND D_E_L_E_T_ = '' "
+		cQuery := ChangeQuery( cQuery )
+		dbUseArea(.T.,__CONNECT,TcGenQry(,,cQuery),cAlias,.F.,.T.)
+		(cAlias)->(DbGoTop())
+	
+	// Definando EMTREA/FILIAL da SC
+		_cEmpre		:= AllTrim(sm0->m0_nome)+" / "+AllTrim(sm0->m0_filial)
+	// Definando numero da solicitação de cotação
+		cNumSc		:= (cAlias)->C1_NUM
+	// Definindo o cUser ( Código do usuário que fez a solicitação de cotação )
+		cUser 		:= (cAlias)->C1_USER
+	// Data de emissão da solicitação de compra
+		cEMISSAO 	:= cValToChar(AllTrim((cAlias)->C1_EMISSAO))
+	// Situação atual da SC se já foi aprovada ou não!
+		cSITUACAO 	:= cValToChar(AllTrim((cAlias)->C1_APROV))
+	
+		// Buscando informações do cadastro de usuário do solicitante "cUser" ( Criador da Solicitação )
+		IF PswSeek(cUser,.T.)  // .T. para usuários e .F. para grupos
+			aDadosUsuario 	:= PswRet() // Array com dados do Usuário usado no PswSeek
+			cSuperior 		:= AllTrim(posicione('AI3',1,xfilial("AI3")+::UserCode,'AI3->AI3_USRSIS')) //Pega CODUSU interno do usuário do portal (AI3)->AI3_USRSIS.
+			cNome 			:= aDadosUsuario[1][2] // Nome do usuário que abriu/criou a SC
+			aSupervisor		:= StrToKarr(cValToChar(AllTrim(cSuperior)),"|") // Transforma String com codigos dos Superiores em Array
+			nTotalSupervi	:= Len(aSupervisor) // Quantidade de superiores do cUser
+			ConOut( "---------------------------[WORFLOW-SETTE]---------------------------" )
+			ConOut( "[WORFLOW-SETTE] Total de Supervisores 				["+cValToChar(nTotalSupervi)+"]" )
+			IF !Empty(cSuperior)
+				// Loop para recuperar os dados dos supervisores
+				For nI := 1 To nTotalSupervi
+					aaMsgRetorno[#(cValToChar(nI))] := Array(#)
+					// Código do usuário do supervidor
+					cUsrSup 	:= aSupervisor[nI]
+					// Apenas para o superior que solicitou			
+					aaMsgRetorno[#(cValToChar(nI))][#'USER'] 		:= cUser
+					aaMsgRetorno[#(cValToChar(nI))][#'NUMSC'] 		:= cNumSc
+					aaMsgRetorno[#(cValToChar(nI))][#'EMPRESA']		:= _cEmpre
+					aaMsgRetorno[#(cValToChar(nI))][#'NOMESOLI']	:= Alltrim(cNome)
+					aaMsgRetorno[#(cValToChar(nI))][#'SUPNOME']		:= Alltrim(UsrFullName(cUsrSup))
+					aaMsgRetorno[#(cValToChar(nI))][#'SUPEMAIL']	:= Alltrim(UsrRetMail(cUsrSup))
+					aaMsgRetorno[#(cValToChar(nI))][#'EMISSAO']		:= u_doDataSx(cEMISSAO)
+					aaMsgRetorno[#(cValToChar(nI))][#'SITUACAO']	:= cSITUACAO
+					
+					aaMsgRetorno[#(cValToChar(nI))][#'60DIAS']		:= Array(#) // Itens dos ultimos 60 dias
+					aaMsgRetorno[#(cValToChar(nI))][#'ITENS']		:= Array(#) // Itens do pedido
+					
+					nDI :=1
+					nIT :=1
+					// Move o cursor para o primeiro registro
+					(cAlias)->(DbGoTop())
+					// Listando os Itens da SC
+					While !(cAlias)->(Eof())
+						// Subitraindo 60 dias da data de Emissão da SC
+						_Inicio := STOD((cAlias)->C1_EMISSAO)-60 // CRIAR PARAMETRO - 18.01.14
+						_Inicio := DTOS(_Inicio)
+						// SQL QUE PEGA AS COMPRAS DE PRODUTOS NOS ULTIMOS 60 DIAS					
+						cQuery2 := "SELECT SD1.D1_EMISSAO, SD1.D1_COD, SD1.D1_QUANT, SD1.D1_FORNECE, SD1.D1_LOJA, SD1.D1_VUNIT, "
+						cQuery2 += "SD1.D1_TOTAL, SD1.D1_LOCAL, SD1.D1_DOC, SD1.D1_UM, SB1.B1_LOCPAD "
+						cQuery2 += "FROM "+RetSqlName("SD1")+" SD1 "
+						cQuery2 += "INNER JOIN "+RetSqlName("SB1")+" SB1 "
+						cQuery2 += " ON SB1.B1_COD = SD1.D1_COD "
+						cQuery2 += " AND SB1.B1_FILIAL = '"+xFilial("SB1")+"' "
+						cQuery2 += "WHERE SD1.D1_COD='"+(cAlias)->C1_PRODUTO+"' AND "
+						cQuery2 += "SD1.D1_EMISSAO BETWEEN '" +(_Inicio)+ "' AND '" +((cAlias)->C1_EMISSAO)+ "' AND "
+						cQuery2 += "SD1.D1_FILIAL='"+(cAlias)->C1_FILIAL+"' AND "
+						cQuery2 += "SD1.D_E_L_E_T_ = '' "
+						MemoWrite("C:\Projetos\SETTE.sql",cQuery2)
+					      // Executa Query
+						cQuery2 := ChangeQuery( cQuery2 )
+						dbUseArea(.T.,__CONNECT,TcGenQry(,,cQuery2),"TRB",.F.,.T.)
+					      
+					      // ULTIMAS COMPRAS
+						If TRB->D1_COD <> (cAlias)->C1_PRODUTO
+					      	// -->Não houve compras nos ultimos 60 dias para esse produto
+						Else
+							While !TRB->(Eof())
+					      		// ITENS DOS 60 DIAS
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))] := Array(#)
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'CODPRODUTO'] 	:= AllTrim(TRB->D1_COD)
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'DESCRICAO'] 	:= AllTrim((cAlias)->C1_DESCRI) //posicione('SB1',1,xfilial("SB1")+TRB->D1_COD,'SB1->B1_DESC')
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'QTD'] 			:= AllTrim(TransForm(TRB->D1_QUANT,cPictQuant))
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'UNIDADE'] 		:= AllTrim(TRB->D1_UM)
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'FORNECEDOR'] 	:= AllTrim(TRB->D1_FORNECE)+"/"+AllTrim(TRB->D1_LOJA)
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'VALOR'] 		:= AllTrim(TransForm(TRB->D1_VUNIT,cPictVlrUn))
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'TOTAL'] 		:= AllTrim(TransForm(TRB->D1_TOTAL,cPictVlrTo))
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'EMISSAO'] 		:= u_doDataSx(TRB->D1_EMISSAO)
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'DOC'] 			:= AllTrim(TRB->D1_DOC)
+								aaMsgRetorno[#(cValToChar(nI))][#'60DIAS'][#(cValToChar(nDI))][#'ALMOX'] 		:= AllTrim(TRB->B1_LOCPAD) //"B1_LOCPAD"//posicione('SZO',1,xfilial('SZ0')+AllTrim(TRB->D1_LOCAL),'SZO->ZO_DESCRIC')
+								TRB->(DbSkip())
+								nDI++
+							EndDo
+						Endif
+						TRB->(DBCloseArea())
+						//ITENS DA SOLICITAÇÃO
+						aaMsgRetorno[#(cValToChar(nI))][#'ITENS'][#(cValToChar(nIT))] := Array(#)
+						aaMsgRetorno[#(cValToChar(nI))][#'ITENS'][#(cValToChar(nIT))][#'ITEM'] 		:= AllTrim((cAlias)->C1_ITEM)
+						aaMsgRetorno[#(cValToChar(nI))][#'ITENS'][#(cValToChar(nIT))][#'PRODUTO'] 	:= AllTrim((cAlias)->C1_PRODUTO)
+						aaMsgRetorno[#(cValToChar(nI))][#'ITENS'][#(cValToChar(nIT))][#'DESCRICAO']	:= AllTrim((cAlias)->C1_DESCRI)
+						aaMsgRetorno[#(cValToChar(nI))][#'ITENS'][#(cValToChar(nIT))][#'QTD']		:= AllTrim(cValToChar((cAlias)->C1_QUANT))
+						aaMsgRetorno[#(cValToChar(nI))][#'ITENS'][#(cValToChar(nIT))][#'UNIDADE']	:= AllTrim((cAlias)->C1_UM)
+						aaMsgRetorno[#(cValToChar(nI))][#'ITENS'][#(cValToChar(nIT))][#'DENTREGA']	:= u_doDataSx((cAlias)->C1_DATPRF)
+						aaMsgRetorno[#(cValToChar(nI))][#'ITENS'][#(cValToChar(nIT))][#'CCUSTO']	:= AllTrim(posicione('CTT',1,xfilial('CTT')+(cAlias)->C1_CC,'CTT_DESC01'))
+						aaMsgRetorno[#(cValToChar(nI))][#'ITENS'][#(cValToChar(nIT))][#'OBS']		:= AllTrim((cAlias)->C1_OBS)
+						nIT++
+						(cAlias)->(DbSkip())
+					EndDo
+				Next
+			Else
+				aaMsgRetorno[#'msg'] := "errorusrsis"
+			EndIf
+			
+		ENDIF
+		(cAlias)->(DBCloseArea())
+		::cRetorno := ToJson(aaMsgRetorno)
+	//::cRetorno := cUser
+	
+	ELSE // IF PrtChkUser
+		lRetorno := .F.
+	ENDIF
+
+	RestArea(aArea)
+Return (lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSAprovaRejeitaSC #Autor: Alexandre Sette #Data: 24.01.2014++
+++===========================================================================++
+++ Descrição: | Aprova ou Rejeita Solicitação de Compra						 ++
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| UserCode, cNUMSC, SITUACAO, MOTIVO                            ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/                       
+	WSMETHOD WSAprovaRejeitaSC WSRECEIVE UserCode, cNUMSC, SITUACAO, MOTIVO WSSEND cRetorno WSSERVICE WSSEMAR
+// Definição de variáveis
+	Local aArea 		:= getArea()
+	Local lRetorno 		:= .T.
+	Local cAliasSC1		:= "SC1"
+	Local cUSER			:= ""
+	Local cNumSc		:= ""
+	Local cSuperior		:= ""
+	Local cNomeSoli		:= ""
+	Local cEmailSoli	:= ""
+	Local cNomeSup		:= ""
+	Local cEmailSup		:= ""
+	Local cSituacaoAtual:= ""
+	Local __CONNECT 	:= "TOPCONN"
+// ARRAY JSON DE RETORNO
+	Local aaMsgRetorno	:= Array(#)
+
+	IF PrtChkUser(::UserCode,"WSSEMAR","WSAprovaRejeitaSC")
+		ConOut( "##################################################")
+		ConOut( "#	  INICIANDO PROCESSO DE LIBERACAO/REJEICAO    #")
+		ConOut( "##################################################")
+    // Dados do Superior
+		cSuperior 	:= AllTrim(posicione('AI3',1,xfilial("AI3")+::UserCode,'AI3->AI3_USRSIS')) //Pega CODUSU interno do usuário do portal (AI3)->AI3_USRSIS.
+		cNumSc		:= cValToChar(AllTrim(::cNUMSC))
+		ConOut( "#================================================#")
+		ConOut( "# cSuperior 					   ["+cSuperior+"]#")
+		ConOut( "# cNumSC  					       ["+cNumSc+"]   #")
+   	
+   	
+   	// 1ª Busca SC para verificar se já foi provada ou não
+		cAlias := GetNextAlias()
+		cQuery := "SELECT C1_APROV, C1_USER FROM "+RetSqlName(cAliasSC1)
+		cQuery += " WHERE C1_NUM='"+cNumSc+"' AND C1_FILIAL = '" + xFilial(cAliasSC1) + "' AND D_E_L_E_T_ = ''"
+		cQuery += " GROUP BY C1_NUM, C1_APROV, C1_USER "
+		cQuery := ChangeQuery( cQuery )
+		dbUseArea(.T.,__CONNECT,TcGenQry(,,cQuery),cAlias,.F.,.T.)
+		(cAlias)->(DbGoTop())
+	// cUSER
+		cUSER := AllTrim((cAlias)->C1_USER)
+		ConOut( "# cUSER  					       ["+cUSER+"]    #")
+	// Situação atual Aprovado/Reprovado
+		cSituacaoAtual := cValToChar(AllTrim((cAlias)->C1_APROV))
+		ConOut( "# cSituacaoAtual			       ["+cSituacaoAtual+"]#")
+		IF Empty(cSituacaoAtual) // Caso nao tenha sido aprovada/rejeitada
+			IF !Empty(cSuperior)
+	   		// Pega nome e email do Aprovador ( Superior ) para salvar no SC
+				cNomeSup		:= Alltrim(UsrFullName(cSuperior))
+				cEmailSup		:= Alltrim(UsrRetMail(cSuperior))
+	   		// Pega Nome e email do solicitante
+				cNomeSoli		:= AllTrim(UsrFullName(cUSER))
+				cEmailSoli		:= Alltrim(UsrRetMail(cUSER))
+	   		// Situação Aprovado
+				IF cValToChar(AllTrim(::SITUACAO)) == "L" // Caso a SC tenha sido aprovada
+				// Atualiza SC para L = Liberada a C1_APROVs
+					cStatement := " UPDATE " + RETSQLNAME(cAliasSC1)
+					cStatement += " SET C1_APROV = 'L' , C1_YDTAPRO = '" + DTOS(dDataBase) + "' , C1_NOMAPRO = '"+SubString(cNomeSup,1,24)+ "' "
+					cStatement += " WHERE C1_FILIAL = '" + xFilial("SC1") + "' AND C1_NUM='" + cNumSc +"' AND D_E_L_E_T_ = '' "
+				
+					IF (TCSQLExec(cStatement) < 0)
+						ConOut( " SQL ERRO -> " + TCSQLError() )
+						aaMsgRetorno[#'msg'] := TCSQLError()
+					Else
+						aaMsgRetorno[#'msg'] 		:= "sucessoaprovada"
+						aaMsgRetorno[#'cNomeSup'] 	:= cNomeSup
+						aaMsgRetorno[#'cEmailSup'] 	:= cEmailSup
+						aaMsgRetorno[#'cNomeSoli'] 	:= cNomeSoli
+						aaMsgRetorno[#'cEmailSoli'] := cEmailSoli
+						TCRefresh(RETSQLNAME(cAliasSC1))
+					EndIF
+				ElseIf cValToChar(AllTrim(SITUACAO)) == "R" // Caso a SC tenha sido cancelada/rejeitada
+			
+				// Atualiza para R = Rejeitado a C1_APROV
+					cStatement := " UPDATE " + RETSQLNAME(cAliasSC1)
+					cStatement += " SET C1_APROV = 'R' "
+					cStatement += " WHERE C1_FILIAL = '" + xFilial("SC1") + "' AND C1_NUM='" + cNumSc +"' AND D_E_L_E_T_ = '' "
+			
+					IF (TCSQLExec(cStatement) < 0)
+						ConOut( " SQL ERRO -> " + TCSQLError() )
+						aaMsgRetorno[#'msg'] := TCSQLError()
+					Else
+						aaMsgRetorno[#'msg'] 		:= "sucessoreprovada"
+						aaMsgRetorno[#'cNomeSup'] 	:= cNomeSup
+						aaMsgRetorno[#'cEmailSup'] 	:= cEmailSup
+						aaMsgRetorno[#'cNomeSoli'] 	:= cNomeSoli
+						aaMsgRetorno[#'cEmailSoli'] := cEmailSoli
+						TCRefresh(RETSQLNAME(cAliasSC1))
+					EndIF
+				Else
+					aaMsgRetorno[#'msg'] := "situacaoinvalida"
+				EndIf
+			Else
+				aaMsgRetorno[#'msg'] := "errorusrsis"
+			EndIf
+		Else // Caso já tenha sido aprovada/rejeitada
+			If cSituacaoAtual == "L" // Informa que já foi aprovada!
+				aaMsgRetorno[#'msg'] := "scjaaprovada"
+			ElseIf cSituacaoAtual == "R" // Informa que já foi reprovada!
+				aaMsgRetorno[#'msg'] := "scjareprovada"
+			Else // Infoma que deu pau! É quase impossível chegar aqui pois se estiver em ' ' entra no IF Empty((cAlias)->C1_APROV)
+				aaMsgRetorno[#'msg'] := "situacaoinvalida"
+			EndIf
+		EndIf // Empty((cAlias)->C1_APROV)
+    // Fechar o cAlias ( Conexão ) 
+		::cRetorno := ToJson(aaMsgRetorno)
+		(cAlias)->(DBCloseArea())
+    
+	ELSE // IF PrtChkUser
+		lRetorno := .F.
+	ENDIF
+
+	RestArea(aArea)
+Return (lRetorno)
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++===========================================================================++
+++ Função:    | #WSEnviaSCParaCotacao #Autor: Alexandre Sette #Data: 27.01.2014++
+++===========================================================================++
+++ Descrição: | Após SC Aprovada envia para SC8 para realizar cotação.    	 ++
+++            | 							                                 ++
+++===========================================================================++
+++ Sintaxe:   |                                                              ++
+++===========================================================================++
+++ Parametros:| UserCode, cNUMSC, SITUACAO, MOTIVO                            ++
+++===========================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     ++
+++===========================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         ++
+++===========================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       ++
+++===========================================================================++
+++              |        |      |                                            ++
+++===========================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/   
+
+WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVICE WSSEMAR
+// Definição de variáveis
+	Local aArea		  := GetArea()  
+	// SETTE             
+	Local lRetorno 		:= .T.
+	Local aaMsgRetorno	:= Array(#)
+	Local cAliasSC1		:= "SC1"    
+	Local cNumCot 		:= "" // Numero da cotação MAX() de SC8
+	Local cCotaGrp		:= ""
+	local cCodFornece	:= ""
+	Local __CONNECT 	:= "TOPCONN"
+	Local nSeqItenForne	:= 1
+	Local cSeqItenForne	:= ""
+	Local aSeqItenForne	:= {}
+	Local dValidade	  	:= dDataBase
+	Local nDiasVal    	:= 1
+	Local nAmarracao  	:= 1
+	Local nIndiceRet	:= 1
+	//Local aAreaSC1	  := SC1->(GetArea())
+	Local aAreaSB1	  := SB1->(GetArea())
+	Local aAreaSA2	  := SA2->(GetArea())
+	Local aAreaSA5	  := SA5->(GetArea())
+	Local aAreaSAD	  := SAD->(GetArea())
+	Local aStruSA5	  := SA5->(dbStruct())
+	Local aStruSAD	  := SAD->(dbStruct())
+	Local aSizeAut	  := MsAdvSize(,.F.)
+	Local aObjects	  := {}
+	Local aInfo 	  := {}
+	Local aPosObj	  := {}
+	Local aFornec	  := {}
+	Local aFornecAux  := {}
+	Local aUltFor	  := {}
+	Local aAlter	  := {}
+	Local aDelItems   := {}
+	Local aLastIdent  := {}
+
+	Local cAliasSA5	  := "SA5"
+	Local cAliasSAD	  := "SAD"
+	Local cQuery	  := ""
+	Local cCodTab     := ""
+	Local cRefGrd     := ""
+	Local cProdRef    := ""
+	Local cItemNoGrd  := ""
+	Local cLastIdent  := ""
+	Local cLastItem   := ""
+	Local cItemGrd    := ""
+	Local cNewCodTab  := ""
+
+	Local nSaveSX8    := GetSX8Len()
+	Local nCntFor	  := 0
+	Local nOpcA		  := 0
+	Local nCont		  := 0
+	Local nScan       := 0
+	Local nScanRef    := 0
+
+	Local lContinua	  := .T.
+	Local lGravou	  := .F.
+	Local lQuery	  := .F.
+	Local lRet        := .F.
+	Local lAchou      := .F.
+	Local lReferencia := .F.
+
+	Local oDlg
+	Local oGet
+	Local aButtons:={},nInd
+	Local nX        := 0
+	Local aHeadUser := {}
+	Local aColsUser := {}
+	Local oScroll
+	PRIVATE aHeader   := {}
+	PRIVATE aCols	  := {}
+
+
+	
+
+	IF PrtChkUser(::UserCode,"WSSEMAR","WSEnviaSCParaCotacao")
+		ConOut( "# ================================================== #") 
+		ConOut( "# ========== Iniciando Envio para Cotacao ========== #")
+		ConOut( "# ================================================== #")
+		// Carrega parametros
+		Pergunte("MTA130",.F.)
+		// Pegando valores defautls dos parametros
+			nDiasVal    := MV_PAR04 
+			nAmarracao	:= MV_PAR06     
+		
+		ConOut( "# ================================================== #")
+		ConOut( "# =========== Perguntando ao MTA130 ================ #")
+		ConOut( "# ================================================== #")
+		ConOut( "# MV_PAR04 ------------------------["+ cValToChar(MV_PAR04)+"]--- #")
+		ConOut( "# MV_PAR06 ------------------------["+cValToChar(MV_PAR06)+"]--- #")
+		ConOut( "# ================================================== #")
+		// Numero sequêncial da cotação de compra ( C8_NUM
+		cNumCot 	:= u_smgetSeq("SC8","C8_NUM")
+		cCotaGrp 	:= cValToChar(AllTrim(GetMv("MV_RESTCOM")))
+		
+		// 1º Step Lista itens ds SC para iniciar a transferencia para SC8
+		cAlias := GetNextAlias()
+		cQuery := "SELECT * FROM "+RetSqlName(cAliasSC1)
+		cQuery += " WHERE C1_NUM='"+::cNUMSC+"' AND C1_FILIAL = '" + xFilial(cAliasSC1) + "' AND C1_COTACAO = '' AND D_E_L_E_T_ = ''"		
+		cQuery += " ORDER BY C1_FILIAL, C1_FORNECE, C1_ITEM "
+		cQuery := ChangeQuery( cQuery )
+		dbUseArea(.T.,__CONNECT,TcGenQry(,,cQuery),cAlias,.F.,.T.)
+		(cAlias)->(DbGoTop())
+		while !(cAlias)->(Eof()) // Loop nos itens 		
+		
+			IF cValToChar(AllTrim(cCodFornece)) == cValToChar(AllTrim((cAlias)->C1_FORNECE))
+				nSeqItenForne++ 
+				cSeqItenForne := StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
+			Else
+				nSeqItenForne := 1
+				cSeqItenForne := StrZero(1,Len(SC8->C8_IDENT))
+			EndIf
+			// Código do fornecedor		
+			// Caso esteja em branco: Fazer busca de todos os fornecedores para esse C1_PRODUTO ( Cód. Produto )
+			cCodFornece := cValToChar(AllTrim((cAlias)->C1_FORNECE))
+			IF !Empty(cCodFornece)  
+			// Garantindo transação
+			Begin Transaction
+				//==================================================================
+				// BLOCO PARA COTACAO DIRETA ( Fornecedor Informado )
+				//==================================================================
+					//==================================================================
+					// BLOCO PARA CALCULO DE DATA DE VALIDADE DA COTAÇÃO
+					//==================================================================
+						While nDiasVal > 0
+					        dValidade++				
+							dValida := DataValida(dValidade)
+					        If dValida == dValidade
+								nDiasVal--
+					        EndIf
+						EndDo
+					//==================================================================
+					// Quantidades
+					nQtdSC 	:= (cAlias)->C1_QUANT - (cAlias)->C1_QUJE
+					nQtdSC2 := (cAlias)->C1_QTSEGUM
+					//==================================================================
+					// Posiciona Registros e Atualiza a Amarracao
+					//==================================================================			
+						// Produto
+						dbSelectArea("SB1") 
+						dbSetOrder(1)
+						MsSeek( xFilial("SB1")+(cAlias)->C1_PRODUTO)
+						
+						// Fornecedores
+						dbSelectArea("SA2")
+						dbSetOrder(1)
+						MsSeek( xFilial("SA2")+(cAlias)->C1_FORNECE+(cAlias)->C1_LOJA )
+					//=================================================================
+					// Regras de Amarração Produto X Fornecedor
+					//=================================================================
+							dbSelectArea("SA5")
+							dbSetOrder(1)
+							lAchou:=MsSeek(xFilial("SA5")+(cAlias)->C1_FORNECE+(cAlias)->C1_LOJA+(cAlias)->C1_PRODUTO)
+							If !lAchou
+								dbSelectArea("SA5")
+								dbSetOrder(9)
+								lAchou:=MsSeek(xFilial("SA5")+(cAlias)->C1_FORNECE+(cAlias)->C1_LOJA+(cAlias)->C1_PRODUTO)
+							Endif	
+							If lAchou
+								cCodTab := SA5->A5_CODTAB
+							Endif
+					//==============================================================================
+					// Cria amarração Produto X Fornecedor
+					//==============================================================================
+					dbSelectArea("AI3")
+					dbSetOrder(1)
+					dbSeek(xFilial("AI3")+::UserCode)
+					IF !FOUND()
+						RecLock("SA5",.T.)
+						SA5->A5_FILIAL  := xFilial("SA5") 
+						SA5->A5_FORNECE := cCodFornece
+						SA5->A5_LOJA 	:= cCodFornece
+						SA5->A5_NOMEFOR	:= cCodFornece
+						SA5->A5_PRODUTO	:= cCodFornece
+						SA5->A5_NOMPROD	:= cCodFornece
+						SA5->(MsUnLock())
+						
+					ENDIF
+					//==============================================================================
+						//==============================================================================
+						// Regras de MV_PAR06 ( Amarração de Preço )
+						//==============================================================================
+							//--------------------------------------------------------------------------
+							// Carrega o codigo da tabela de precos do grupo X fornecedor caso hover.  
+							//--------------------------------------------------------------------------
+							If SAD->(FieldPos("AD_CODTAB")) > 0
+								If (nAmarracao == 2 .Or. nAmarracao == 3 )// Grupo
+									dbSelectArea("SAD")
+									dbSetOrder(2)
+									MsSeek(xFilial("SAD")+SB1->B1_GRUPO+(cAlias)->C1_FORNECE+(cAlias)->C1_LOJA)
+									If Empty(cCodTab)
+										cCodTab := SAD->AD_CODTAB
+									EndIf
+								EndIf
+							EndIf
+			
+							//--------------------------------------------------------------------------
+							// Ponto de Entrada para selecionar uma nova tabela de preco para cotacao. 
+							//--------------------------------------------------------------------------	
+							If ExistBlock("A130CODTAB")
+								cNewCodTab:=ExecBlock("A130CODTAB",.F.,.F.,{(cAlias)->C1_PRODUTO,SB1->B1_GRUPO,(cAlias)->C1_FORNECE+(cAlias)->C1_LOJA,cCodtab})
+								If ValType(cNewCodTab) == "C"
+									cCodTab:=cNewCodTab
+								EndIf
+							EndIf
+					 //==============================================================================
+						ConOut( "# ================Iniciando gravação de dados================= #")
+					 	ConOut( "# -Produto["+(cAlias)->C1_PRODUTO+"]---- X ---- Fornecedor["+cCodFornece+"]------ #")
+					 	ConOut( "# -Sequencia e => n["+cValToChar(nSeqItenForne)+"] c["+cSeqItenForne+"]#")
+					 	ConOut( "# ======= Gravando Produto de um Fornecedor informado ======== #")
+					// Gravando dados 
+						RecLock("SC8",.T.)
+						SC8->C8_FILIAL  := xFilial("SC8")
+						SC8->C8_FILENT  := (cAlias)->C1_FILENT
+						SC8->C8_NUM     := cNumCot // Numero da cotação (Ex: 000001, 000002 ...)
+						SC8->C8_ITEM    := cValToChar(AllTrim(cSeqItenForne)) //If(nScan == Nil, cItem, aGrade[nScan, 3]) // Sequência numérica, por fornecedor
+						SC8->C8_EMISSAO := dDataBase
+						SC8->C8_CONTATO := SA2->A2_CONTATO
+						SC8->C8_GRUPCOM := (cAlias)->C1_GRUPCOM
+						SC8->C8_COND    := SA2->A2_COND
+						SC8->C8_FORNECE := SA2->A2_COD
+						SC8->C8_LOJA    := SA2->A2_LOJA
+						SC8->C8_PRODUTO := (cAlias)->C1_PRODUTO
+						SC8->C8_PRAZO   := RetFldProd(SB1->B1_COD,"B1_PE")
+						SC8->C8_UM      := (cAlias)->C1_UM
+						SC8->C8_VALIDA  := dValidade
+						SC8->C8_QUANT   := nQtdSC
+						SC8->C8_NUMPRO  := "01"
+						SC8->C8_DATPRF  := Max(SToD((cAlias)->C1_DATPRF),dDataBase) // Verificar
+						SC8->C8_NUMSC   := (cAlias)->C1_NUM
+						SC8->C8_ITEMSC  := (cAlias)->C1_ITEM // Sequência numérica da propria SC
+						SC8->C8_ITSCGRD := (cAlias)->C1_ITEMGRD
+						SC8->C8_OBS     := (cAlias)->C1_OBS
+						SC8->C8_IDENT   := (cAlias)->C1_IDENT //If(nScan == Nil,cIdent ,aGrade[nScan, 5]) // Sequencia numerica dos itens da cotação
+						SC8->C8_SEGUM	:= (cAlias)->C1_SEGUM
+						SC8->C8_QTSEGUM := nQtdSC2
+						SC8->C8_CODTAB  := cCodTab
+						SC8->C8_ORIGEM  := (cAlias)->C1_ORIGEM
+						// cPaisLoc 
+						SC8->C8_PICM    := SB1->B1_PICM
+						SC8->C8_ALIIPI  := SB1->B1_IPI
+						// Não Sei
+						//SC8->C8_ITEMGRD := (cAlias2)->C1_IDENT//If(nScan == Nil, "" , aGrade[nScan, 4])
+						//SC8->C8_GRADE   := If(nScan == Nil, "" , "S")
+						If !Empty(SC8->C8_CODTAB)
+							dbSelectArea("AIA")
+							dbSetOrder(1)
+							If MsSeek(xFilial("AIA")+SC8->C8_FORNECE+SC8->C8_LOJA+SC8->C8_CODTAB)
+								If !Empty(AIA->AIA_CONDPG)
+									SC8->C8_COND := AIA->AIA_CONDPG
+								EndIf
+								SC8->C8_PRECO   := MaTabPrCom(SC8->C8_CODTAB,SC8->C8_PRODUTO,SC8->C8_QUANT,SC8->C8_FORNECE,SC8->C8_LOJA,1,SC8->C8_EMISSAO)
+								SC8->C8_TOTAL   := NoRound(SC8->C8_QUANT*SC8->C8_PRECO,2)
+							EndIf
+						EndIf
+						SC8->(MsUnLock())
+						ConOut( "# ======= Final gravação Produto de um Fornecedor informado ======== #")  
+						ConOut( "# ======= Gravando numero da cotação em SC1 ======================== #") 
+							dbSelectArea("SC1")
+							dbSetOrder(1)
+							MsSeek(xFilial("SC1")+(cAlias)->C1_NUM+(cAlias)->C1_ITEM)
+							RecLock("SC1",.F.)
+							SC1->C1_COTACAO:= cNumCot
+							//SC1->C1_IDENT   := If(nScan == Nil,cIdent ,aGrade[nScan, 5])
+							MsUnLock()
+						aaMsgRetorno[#(cValToChar(nIndiceRet))] := Array(#)
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nNumCotacao'] := cNumCot 
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nNumSC'] := cValToChar(AllTrim((cAlias)->C1_NUM))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nFornecedor'] := cValToChar(AllTrim(SA2->A2_COD))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'cNomeFornecedor'] := cValToChar(AllTrim(SA2->A2_NOME))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'cEmailFornecedor'] := cValToChar(AllTrim(SA2->A2_EMAIL))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nItem'] := cValToChar(AllTrim((cAlias)->C1_ITEM))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'msg'] := "sucesso"
+						ConOut( "# ======= Gravação finalizada com sucesso !! ======================= #") 
+						nIndiceRet++
+				//==================================================================
+				// FIM DO BLOCO PARA COTACAO DIRETA ( Fornecedor Informado ) 		
+				//================================================================== 
+			End Transaction
+			Else
+			// Garantindo transações
+			Begin Transaction
+			//==================================================================
+			// BLOCO PARA COTAÇÃO COM VÁRIOS FORNECEDORES 		
+			//==================================================================
+				// Zera contador de Fornecedor
+				nSeqItenForne := 0
+				cSeqItenForne := ""
+				// Zera Cod. Fornecedor
+				cCodFornece := ""
+				// -------------------------------------------------------------
+				// "Produto cartesiano": 
+				// Ocorre quando não é informado o fornecedor para o produto. 
+				// O sistema busca todos os fornecedores para esse produto.
+				// -------------------------------------------------------------
+				cAlias2 := GetNextAlias()
+				cQuery2 := "SELECT SC1.*, SA5.A5_FORNECE, SA5.A5_LOJA FROM "+RetSqlName(cAliasSC1)+" SC1 "
+				cQuery2 += " INNER JOIN "+RetSqlName(cAliasSA5)+" SA5 "
+				cQuery2 += " ON SA5.A5_PRODUTO = SC1.C1_PRODUTO "
+				cQuery2 += " WHERE SC1.C1_NUM='"+::cNUMSC+"' AND SC1.C1_FILIAL = '" + xFilial(cAliasSC1) + "' AND SC1.D_E_L_E_T_ = ''"
+				cQuery2 += " AND SA5.A5_PRODUTO='"+(cAlias)->C1_PRODUTO+"' AND SA5.A5_FILIAL = '" + xFilial(cAliasSA5) + "' AND SA5.D_E_L_E_T_ = ''"		
+				cQuery2 += " ORDER BY SC1.C1_FILIAL, SC1.C1_FORNECE, SC1.C1_ITEM "				
+				ConOut( "# ================ QUERY ================= #")				
+				cQuery2 := ChangeQuery( cQuery2 )
+				dbUseArea(.T.,__CONNECT,TcGenQry(,,cQuery2),cAlias2,.F.,.T.)
+				(cAlias2)->(DbGoTop())
+				While !(cAlias2)->(Eof())
+					// Adicionar Fornecedor para consultar
+					aAdd(aSeqItenForne,cValToChar(AllTrim((cAlias2)->A5_FORNECE)))
+					// Zera Sequenciador
+					nSeqItenForne := 0
+					//==================================================================
+					// BLOCO PARA CALCULO DE DATA DE VALIDADE DA COTAÇÃO
+					//==================================================================
+						While nDiasVal > 0
+					        dValidade++				
+							dValida := DataValida(dValidade)
+					        If dValida == dValidade
+								nDiasVal--
+					        EndIf
+						EndDo
+					//================================================================== 
+					// Buscando fornecedor no array de fornecedores
+					FOR nBusca:=1 To Len(aSeqItenForne)
+						IF cValToChar(AllTrim(aSeqItenForne[nBusca])) == cValToChar(AllTrim((cAlias2)->A5_FORNECE))
+						  nSeqItenForne++
+						EndIf
+					Next
+					// Numero da sequência para o fornecedor X
+					cSeqItenForne := StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
+					
+					
+					// Coisa velha :D
+					/*IF cValToChar(AllTrim(cCodFornece)) == cValToChar(AllTrim((cAlias2)->A5_FORNECE))
+						nSeqItenForne++ 
+			   			cSeqItenForne := StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
+					Else
+						nSeqItenForne := 1
+						cSeqItenForne := StrZero(1,Len(SC8->C8_IDENT))
+					EndIf
+					*/    
+					
+					
+					cCodFornece := cValToChar(AllTrim((cAlias2)->A5_FORNECE))
+					// Quantidades
+					nQtdSC 	:= (cAlias2)->C1_QUANT - (cAlias2)->C1_QUJE
+					nQtdSC2 := (cAlias2)->C1_QTSEGUM
+					//==================================================================
+					// Posiciona Registros e Atualiza a Amarracao
+					//==================================================================			
+						// Produto
+						dbSelectArea("SB1") 
+						dbSetOrder(1)
+						MsSeek( xFilial("SB1")+(cAlias2)->C1_PRODUTO)
+						
+						// Fornecedores
+						dbSelectArea("SA2")
+						dbSetOrder(1)
+						MsSeek( xFilial("SA2")+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA)
+					//=================================================================
+					// Regras de Amarração Produto X Fornecedor
+					//=================================================================
+							dbSelectArea("SA5")
+							dbSetOrder(1)
+							lAchou:=MsSeek(xFilial("SA5")+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA+(cAlias2)->C1_PRODUTO)
+							If !lAchou
+								dbSelectArea("SA5")
+								dbSetOrder(9)
+								lAchou:=MsSeek(xFilial("SA5")+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA+(cAlias2)->C1_PRODUTO)
+							Endif	
+							If lAchou
+								cCodTab := SA5->A5_CODTAB
+							Endif
+						//==============================================================================
+						// Regras de MV_PAR06 ( Amarração de Preço )
+						//==============================================================================							
+							//--------------------------------------------------------------------------
+							// Carrega o codigo da tabela de precos do grupo X fornecedor caso hover.  
+							//--------------------------------------------------------------------------
+							If SAD->(FieldPos("AD_CODTAB")) > 0
+								If (nAmarracao == 2 .Or. nAmarracao == 3 )// Grupo
+									dbSelectArea("SAD")
+									dbSetOrder(2)
+									MsSeek(xFilial("SAD")+SB1->B1_GRUPO+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA)
+									If Empty(cCodTab)
+										cCodTab := SAD->AD_CODTAB
+									EndIf
+								EndIf
+							EndIf
+			
+							//--------------------------------------------------------------------------
+							// Ponto de Entrada para selecionar uma nova tabela de preco para cotacao. 
+							//--------------------------------------------------------------------------	
+							If ExistBlock("A130CODTAB")
+								cNewCodTab:=ExecBlock("A130CODTAB",.F.,.F.,{(cAlias2)->C1_PRODUTO,SB1->B1_GRUPO,(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA,cCodtab})
+								If ValType(cNewCodTab) == "C"
+									cCodTab:=cNewCodTab
+								EndIf
+							EndIf
+					 //==============================================================================
+				 	ConOut( "# ================Iniciando gravação de dados================= #")
+				 	ConOut( "# -Produto["+(cAlias2)->C1_PRODUTO+"]---- X ---- Fornecedor["+cCodFornece+"]------ #")
+				 	ConOut( "# -Sequencia e => ["+cSeqItenForne+"] #")
+				 	ConOut( "# ================Gravando Produto X Fornecedor ============== #")
+					// Gravando dados 
+						RecLock("SC8",.T.)
+						SC8->C8_FILIAL  := xFilial("SC8")
+						SC8->C8_FILENT  := (cAlias2)->C1_FILENT
+						SC8->C8_NUM     := cNumCot // Numero da cotação (Ex: 000001, 000002 ...)
+						SC8->C8_ITEM    := cValToChar(AllTrim(cSeqItenForne)) //If(nScan == Nil, cItem, aGrade[nScan, 3]) // Sequência numérica, por fornecedor
+						SC8->C8_EMISSAO := dDataBase
+						SC8->C8_CONTATO := SA2->A2_CONTATO
+						SC8->C8_GRUPCOM := (cAlias2)->C1_GRUPCOM
+						SC8->C8_COND    := SA2->A2_COND
+						SC8->C8_FORNECE := SA2->A2_COD
+						SC8->C8_LOJA    := SA2->A2_LOJA
+						SC8->C8_PRODUTO := (cAlias2)->C1_PRODUTO
+						SC8->C8_PRAZO   := RetFldProd(SB1->B1_COD,"B1_PE")
+						SC8->C8_UM      := (cAlias2)->C1_UM
+						SC8->C8_VALIDA  := dValidade
+						SC8->C8_QUANT   := nQtdSC
+						SC8->C8_NUMPRO  := "01"
+						SC8->C8_DATPRF  := Max(SToD((cAlias2)->C1_DATPRF),dDataBase) // Verificar
+						SC8->C8_NUMSC   := (cAlias2)->C1_NUM
+						SC8->C8_ITEMSC  := (cAlias2)->C1_ITEM // Sequência numérica da propria SC
+						SC8->C8_ITSCGRD := (cAlias2)->C1_ITEMGRD
+						SC8->C8_OBS     := (cAlias2)->C1_OBS
+						SC8->C8_IDENT   := (cAlias2)->C1_IDENT //If(nScan == Nil,cIdent ,aGrade[nScan, 5]) // Sequencia numerica dos itens da cotação
+						SC8->C8_SEGUM	:= (cAlias2)->C1_SEGUM
+						SC8->C8_QTSEGUM := nQtdSC2
+						SC8->C8_CODTAB  := cCodTab
+						SC8->C8_ORIGEM  := (cAlias2)->C1_ORIGEM
+						// cPaisLoc 
+						SC8->C8_PICM    := SB1->B1_PICM
+						SC8->C8_ALIIPI  := SB1->B1_IPI
+						// Não Sei
+						//SC8->C8_ITEMGRD := (cAlias2)->C1_IDENT//If(nScan == Nil, "" , aGrade[nScan, 4])
+						//SC8->C8_GRADE   := If(nScan == Nil, "" , "S")
+						If !Empty(SC8->C8_CODTAB)
+							dbSelectArea("AIA")
+							dbSetOrder(1)
+							If MsSeek(xFilial("AIA")+SC8->C8_FORNECE+SC8->C8_LOJA+SC8->C8_CODTAB)
+								If !Empty(AIA->AIA_CONDPG)
+									SC8->C8_COND := AIA->AIA_CONDPG
+								EndIf
+								SC8->C8_PRECO   := MaTabPrCom(SC8->C8_CODTAB,SC8->C8_PRODUTO,SC8->C8_QUANT,SC8->C8_FORNECE,SC8->C8_LOJA,1,SC8->C8_EMISSAO)
+								SC8->C8_TOTAL   := NoRound(SC8->C8_QUANT*SC8->C8_PRECO,2)
+							EndIf
+						EndIf
+						SC8->(MsUnLock()) 
+					ConOut( "# ================Final da gravanção Produto X Fornecedor ============== #")  
+					ConOut( "# ======= Gravando numero da cotação em SC1 ======================== #") 
+						dbSelectArea("SC1")
+						dbSetOrder(1)
+						MsSeek(xFilial("SC1")+(cAlias)->C1_NUM+(cAlias)->C1_ITEM)
+						RecLock("SC1",.F.)
+						SC1->C1_COTACAO:= cNumCot
+						//SC1->C1_IDENT   := If(nScan == Nil,cIdent ,aGrade[nScan, 5])
+						MsUnLock()
+					aaMsgRetorno[#(cValToChar(nIndiceRet))] := Array(#)
+					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nNumCotacao'] := cNumCot 
+					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nNumSC'] := cValToChar(AllTrim((cAlias)->C1_NUM))
+					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nFornecedor'] := cValToChar(AllTrim(SA2->A2_COD))
+					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'cNomeFornecedor'] := cValToChar(AllTrim(SA2->A2_NOME))
+					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'cEmailFornecedor'] := cValToChar(AllTrim(SA2->A2_EMAIL))
+					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nItem'] := cValToChar(AllTrim((cAlias)->C1_ITEM))
+					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'msg'] := "sucesso"
+					nIndiceRet++
+					ConOut( "# ======= Gravação finalizada com sucesso !! ======================= #") 
+					(cAlias2)->(DbSkip())
+					
+				EndDo // Fecha While !(cAlias2)->(Eof()) ( Varios Fornecedores X produto ) 
+			//==================================================================
+			// FIM DO BLOCO PARA COTAÇÃO COM VÁRIOS FORNECEDORES ( Fornecedor não Informado ) 		
+			//==================================================================
+			End Transaction
+			EndIf
+			(cAlias)->(DbSkip())
+		EndDo // Fecha While !(cAlias)->(Eof())	 
+		// Gera Json de retorno
+		::cRetorno := ToJson(aaMsgRetorno)
+	ELSE // IF PrtChkUser
+		lRetorno := .F.
+	ENDIF
+	RestArea(aArea)
+Return (lRetorno)
