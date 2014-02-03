@@ -1,0 +1,47 @@
+#Include "Protheus.ch"
+#Include "Topconn.ch"
+#include "protheus.ch"
+user function tcotacao()
+
+Private cSuperior
+Private cMailSup
+private cNumSc := ""
+private cMsgInf
+private cNome := ""
+private cUser := ""   
+Private _cEmpre := sm0->m0_nome+" / "+sm0->m0_filial
+private aDadosUsuario 	:= {}   
+private aSupervisor		:= {} 
+private cNomeSup		:= ""
+private cUsrSup			:= ""
+	// 000073 => Tamires
+	// 000088 => Edmilson
+	// 000092 => Richardson    
+	
+	cUser := "000073"
+	IF PswSeek(cUser,.T.)  // .T. para usuários e .F. para grupos                          
+		aDadosUsuario := PswRet()
+		cSuperior := aDadosUsuario[1][11] // Dados do Superior do usuário passado no Pswseek! 	              
+		//cSuperior := "000088;000092" // Tamires
+		cNome := aDadosUsuario[1][2] // Nome do usuário passado no PswSeek
+		/*
+		cSuperAux := ''
+		For III = 1 To Len(cSuperior)
+			If Substr(cSuperior,III,1) $ '0/1/2/3/4/5/6/7/8/9'	
+				cSuperAux += Substr(cSuperior,III,1)
+			EndIf
+		Next*/
+		aSupervisor	:= StrToKarr(cValToChar(AllTrim(cSuperior)),"|")
+		//cSuperior := cSuperAux
+		For nI := 1 To Len(aSupervisor)                     
+			cUsrSup 	:= aSupervisor[nI]
+			cNomeSup	:= Alltrim(UsrFullName(cUsrSup))
+			cMailSup 	:= Alltrim(UsrRetMail(cUsrSup))
+			cNumSc 		:= "002727"
+			cMsgInf 	:= _cEmpre+" Solicitação  de Compra : " + cNumSc + ". Foi enviada para aprovação. Cód.Sup => "+cNomeSup+" cMailSup => "+cMailSup
+			MsgInfo( cMsgInf , "TOTVS")
+		Next
+	ENDIF
+
+
+return 
