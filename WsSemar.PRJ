@@ -16,7 +16,10 @@ Group Web Service
       FoldersCount=2
       Folder Fontes
          VSSPath=Fontes
-         FilesCount=0
+         FilesCount=1
+         File \Projetos\Advpl\svn-ws-semar\WSSEMAR.PRW
+             Type=T
+         End
       End
       Folder Definições
          VSSPath=Definições
