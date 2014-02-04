@@ -4,17 +4,24 @@
 #Include "aarray.ch"
 #Include "json.ch"
 
-#DEFINE STR0001 "Web Service responsável por integrar os portais de Cliente/Fornecedor com o Protheus"
-#DEFINE STR0002 "Web Service responsável por integrar os portais de Cliente/Fornecedor com o Protheus" 
+#DEFINE STR0001 "Web Service responsavel por integrar os portais de Cliente/Fornecedor com o Protheus"
+#DEFINE STR0002 "Web Service responsavel por integrar os portais de Cliente/Fornecedor com o Protheus"         
+#DEFINE STR0003 "Web Service responsavel por integrar os portais de Cliente/Fornecedor com o Protheus"         
 
 WSSERVICE MARLON DESCRIPTION STR0001 NAMESPACE "http://webservice.semarsistemas.com.br/wssemar.prw"
 
 WSDATA cNome 	    AS String 
 WSDATA cSobreNome   AS String         
 WSDATA cCelular 	AS String
-WSDATA cTelefone    AS String Optional 
-                
-WSMETHOD WScadastro			DESCRIPTION STR0002 // Retorna os dados                   
+WSDATA cTelefone    AS String Optional     
+WSDATA cRetorno		AS String    
+WSDATA cNum1		AS Integer
+WSDATA cNum2		AS Integer   
+WSDATA cResultado	AS Integer
+                                          
+                                 
+WSMETHOD WScadastro			DESCRIPTION STR0002 // Retorna os dados
+WSMETHOD WSmultiplicacao		DESCRIPTION STR0003                  
 ENDWSSERVICE
 
 WSMETHOD WScadastro WSRECEIVE cNome,cSobreNome WSSEND cRetorno WSSERVICE MARLON 
@@ -23,4 +30,14 @@ WSMETHOD WScadastro WSRECEIVE cNome,cSobreNome WSSEND cRetorno WSSERVICE MARLON
     
     ::cRetorno := cFrase
     
+RETURN (lRetorno)   
+
+WSMETHOD WSmultiplicacao WSRECEIVE cNum1,cNum2 WSSEND cRetorno WSSERVICE MARLON 
+    Local lRetorno   := .T.
+	Local cResultado := ::cNum1 * ::cNum2
+	            
+	::cRetorno := cValToChar(cResultado)
+    
 RETURN (lRetorno)
+
+
