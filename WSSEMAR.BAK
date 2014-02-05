@@ -30,25 +30,26 @@
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //++ Definição de Tipo														 ++                                                                         
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-#DEFINE STR0001 "Web Service responsavel por integrar os portais de Cliente/Fornecedor com o Protheus"
-#DEFINE STR0101 "Método responsavel por retornar os campos do Dicionario/Tabela"
-#DEFINE STR0102 "Método responsavel por retornar os dados do Alias ( Tabela )"
-#DEFINE STR0103 "Método responsavel por retornar os dados para montar o Browse ( Listagem )"
-#DEFINE STR0104 "Método responsavel por cadastrar um novo cliente/usuario"
-#DEFINE STR0105 "Método responsavel por retornar uma lista de Nome/E-mail de dos Auditores do sistema"
-#DEFINE STR0106 "Busca na tabela AI3 os dados cadastrados no formulario cadastre-se, com objetivo de validar os dados informados."
-#DEFINE STR0107 "Busca na tabela AI3 os dados cadastrados no formulario cadastre-se, com objetivo de ativar o cadastro do usuário."
-#DEFINE STR0108 "Busca na tabela AI3 os dados cadastrados no formulario cadastre-se, com objetivo de cancela o cadastro do usuário."
+#DEFINE STR0001 "Web Service responsavel por integrar os portais de Cliente Fornecedor com o Protheus"
+#DEFINE STR0101 "Metodo responsavel por retornar os campos do Dicionario Tabela"
+#DEFINE STR0102 "Metodo responsavel por retornar os dados do Alias"
+#DEFINE STR0103 "Metodo responsavel por retornar os dados para montar o Browse Listagem"
+#DEFINE STR0104 "Metodo responsavel por cadastrar um novo cliente usuario"
+#DEFINE STR0105 "Metodo responsavel por retornar uma lista de Nome Email de dos Auditores do sistema"
+#DEFINE STR0106 "Busca na tabela AI3 os dados cadastrados no formulario cadastrese com objetivo de validar os dados informados"
+#DEFINE STR0107 "Busca na tabela AI3 os dados cadastrados no formulario cadastrese com objetivo de ativar o cadastro do usuario"
+#DEFINE STR0108 "Busca na tabela AI3 os dados cadastrados no formulario cadastrese com objetivo de cancela o cadastro do usuario"
 #DEFINE STR0109 "Busca na tabela SA1 a empresa conforme CNPJ Informado"
-#DEFINE STR0110 "Método responsavel por retornar os campos do Dicionario/Tabela resumido ( So dicionario de WSConsultaEmpresa )"
-#DEFINE STR0111 "Método responsavel por atualiza a senha do usuário"
-#DEFINE STR0112 "Método responsavel pelo conteudo do AI3"
-#DEFINE STR0113 "Método responsavel por atualizar o conteudo do AI3"
-#DEFINE STR0114 "Método responsavel por consultar cotacoes SC1"
-#DEFINE STR0115 "Método responsavel por atualizar DATA/HORA de envio da cotação SC1"
-#DEFINE STR0116 "Método responsavel por retorna JSON com dados da SC"
-#DEFINE STR0117 "Método responsavel por Liberar/Rejeitar a SC"
-#DEFINE STR0118 "Método responsavel por Enviar SC para cotacao de preco."
+#DEFINE STR0110 "Metodo responsavel por retornar os campos do Dicionario Tabela resumido So dicionario de WSConsultaEmpresa"
+#DEFINE STR0111 "Metodo responsavel por atualiza a senha do usuario"
+#DEFINE STR0112 "Metodo responsavel pelo conteudo do AI3"
+#DEFINE STR0113 "Metodo responsavel por atualizar o conteudo do AI3"
+#DEFINE STR0114 "Metodo responsavel por consultar cotacoes SC1"
+#DEFINE STR0115 "Metodo responsavel por atualizar DATA HORA de envio da cotacao SC1"
+#DEFINE STR0116 "Metodo responsavel por retorna JSON com dados da SC"
+#DEFINE STR0117 "Metodo responsavel por Liberar Rejeitar a SC"
+#DEFINE STR0118 "Metodo responsavel por Enviar SC para cotacao de preco" 
+#DEFINE STR0119 "Lista dos itens da cotacao enviado para o fornecedor"
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //++ Definição de estruturas usadas no Web Service                           ++
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++    
@@ -116,8 +117,9 @@ WSDATA cTipo		AS String
 WSDATA cPSW_OLD		AS String
 WSDATA cPSW_NEW		AS String
 WSDATA cNUMSC		AS String
+WSDATA cNUMCE		AS String
 WSDATA cDATAHORA	AS String
-	// Ativa/Rejeita SC
+// Ativa/Rejeita SC
 WSDATA SITUACAO		AS String
 WSDATA MOTIVO		AS String OPTIONAL
 // Retorno
@@ -141,6 +143,7 @@ WSMETHOD WSUpdateEnvioCotacoes		DESCRIPTION STR0115 // Informações na definifiçã
 WSMETHOD WSDadosSolicitacaoCompra	DESCRIPTION STR0116 // Informações na definifição de variavel
 WSMETHOD WSAprovaRejeitaSC			DESCRIPTION STR0117 // Informações na definifição de variavel
 WSMETHOD WSEnviaSCParaCotacao		DESCRIPTION STR0118 // Informações na definifição de variavel
+WSMETHOD WSDadosItensCEFornecedor	DESCRIPTION STR0119 // Lista dos itens da cotação enviado para o fornecedor
 ENDWSSERVICE
                     
 /*
@@ -1723,8 +1726,10 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 	Local nDiasVal    	:= 1
 	Local nAmarracao  	:= 1
 	Local nIndiceRet	:= 1   
-	Local nIdent		:= 1
-	//Local aAreaSC1	  := SC1->(GetArea())
+	Local nIdent		:= 0
+	Local nIdentForn	:= 0
+	Local cIdent		:= ""
+	//Local aAreaSC1	:= SC1->(GetArea())
 	Local aAreaSB1	  := SB1->(GetArea())
 	Local aAreaSA2	  := SA2->(GetArea())
 	Local aAreaSA5	  := SA5->(GetArea())
@@ -1810,7 +1815,7 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 		dbUseArea(.T.,__CONNECT,TcGenQry(,,cQuery),cAlias,.F.,.T.)
 		(cAlias)->(DbGoTop())
 		while !(cAlias)->(Eof()) // Loop nos itens 		
-		
+			nIdent++
 			IF cValToChar(AllTrim(cCodFornece)) == cValToChar(AllTrim((cAlias)->C1_FORNECE))
 				nSeqItenForne++ 
 					cSeqItenForne := StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
@@ -1818,6 +1823,9 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 				nSeqItenForne := 1
 				cSeqItenForne := StrZero(1,Len(SC8->C8_IDENT))
 			EndIf
+			
+			cIdent	:= StrZero(nIdent,Len(SC8->C8_IDENT))
+			
 			// Código do fornecedor		
 			// Caso esteja em branco: Fazer busca de todos os fornecedores para esse C1_PRODUTO ( Cód. Produto )
 			cCodFornece := cValToChar(AllTrim((cAlias)->C1_FORNECE))
@@ -1923,7 +1931,7 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 						SC8->C8_ITEMSC  := (cAlias)->C1_ITEM // Sequência numérica da propria SC
 						SC8->C8_ITSCGRD := (cAlias)->C1_ITEMGRD
 						SC8->C8_OBS     := (cAlias)->C1_OBS
-						SC8->C8_IDENT   := cValToChar(nIdent) //(cAlias)->C1_IDENT //If(nScan == Nil,cIdent ,aGrade[nScan, 5]) // Sequencia numerica dos itens da cotação
+						SC8->C8_IDENT   := cValToChar(cIdent) //(cAlias)->C1_IDENT //If(nScan == Nil,cIdent ,aGrade[nScan, 5]) // Sequencia numerica dos itens da cotação
 						SC8->C8_SEGUM	:= (cAlias)->C1_SEGUM
 						SC8->C8_QTSEGUM := nQtdSC2
 						SC8->C8_CODTAB  := cCodTab
@@ -1976,10 +1984,12 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 			// BLOCO PARA COTAÇÃO COM VÁRIOS FORNECEDORES 		
 			//==================================================================
 				// Zera contador de Fornecedor
-				nSeqItenForne := 0
-				cSeqItenForne := ""
+				nSeqItenForne 	:= 0 
+				nIdentForn 		:= nIdent
+				cSeqItenForne 	:= ""
 				// Zera Cod. Fornecedor
 				cCodFornece := ""
+				cIdentForn	:= ""
 				// -------------------------------------------------------------
 				// "Produto cartesiano": 
 				// Ocorre quando não é informado o fornecedor para o produto. 
@@ -2000,7 +2010,8 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 					// Adicionar Fornecedor para consultar
 					aAdd(aSeqItenForne,cValToChar(AllTrim((cAlias2)->A5_FORNECE)))
 					// Zera Sequenciador
-					nSeqItenForne := 0
+					nSeqItenForne 	:= 0 
+					nIdentForn 		:= nIdent
 					//==================================================================
 					// BLOCO PARA CALCULO DE DATA DE VALIDADE DA COTAÇÃO
 					//==================================================================
@@ -2019,7 +2030,9 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 						EndIf
 					Next
 					// Numero da sequência para o fornecedor X
-					cSeqItenForne := StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
+					cSeqItenForne 	:= StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
+					cIdentForn		:= StrZero(nIdentForn,Len(SC8->C8_IDENT))
+					
 					
 					
 					// Coisa velha :D
@@ -2063,8 +2076,6 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 							If lAchou
 								cCodTab := SA5->A5_CODTAB
 							Endif
-						ConOut( "# =Encontrou Fornecedor X Produto? ["+cValToChar(lAchou)+"]========== #")
-				        Sleep(10000)
 						//==============================================================================
 						// Regras de MV_PAR06 ( Amarração de Preço )
 						//==============================================================================							
@@ -2119,7 +2130,7 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 						SC8->C8_ITEMSC  := (cAlias2)->C1_ITEM // Sequência numérica da propria SC
 						SC8->C8_ITSCGRD := (cAlias2)->C1_ITEMGRD
 						SC8->C8_OBS     := (cAlias2)->C1_OBS
-						SC8->C8_IDENT   := cValToChar(nIdent) //If(nScan == Nil,cIdent ,aGrade[nScan, 5]) // Sequencia numerica dos itens da cotação
+						SC8->C8_IDENT   := cValToChar(cIdentForn) //If(nScan == Nil,cIdent ,aGrade[nScan, 5]) // Sequencia numerica dos itens da cotação
 						SC8->C8_SEGUM	:= (cAlias2)->C1_SEGUM
 						SC8->C8_QTSEGUM := nQtdSC2
 						SC8->C8_CODTAB  := cCodTab
@@ -2168,8 +2179,7 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 			// FIM DO BLOCO PARA COTAÇÃO COM VÁRIOS FORNECEDORES ( Fornecedor não Informado ) 		
 			//==================================================================
 			End Transaction
-			EndIf               
-			nIdent++
+			EndIf               			
 			(cAlias)->(DbSkip())			
 		EndDo // Fecha While !(cAlias)->(Eof())	 
 		// Gera Json de retorno
@@ -2179,3 +2189,104 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 	ENDIF
 	RestArea(aArea)
 Return (lRetorno)
+                                            
+
+/*
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+++=================================================================================++
+++ Função:    | #WSDadosItensCEFornecedor #Autor: Alexandre Sette #Data: 04.02.2014++
+++=================================================================================++
+++ Descrição: | Listagem dos itens da cotação de preço (SC8 e SB1) para digitar    ++
+++            | Preço, IPI, ICMS ...    	                                 	   ++
+++=================================================================================++
+++ Sintaxe:   |                                                              	   ++
+++=================================================================================++
+++ Parametros:| UserCode, cNUMCE                                              	   ++
+++=================================================================================++
+++ Uso:       | Integração com portal Cliente/Fornecedor                     	   ++
+++=================================================================================++
+++ Atualizacoes sofridas desde a Construcao Inicial.                         	   ++
+++=================================================================================++
+++ Programador  | Data   | BOPS |  Motivo da Alteracao                       	   ++
+++=================================================================================++
+++              |        |      |                                            	   ++
+++=================================================================================++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+*/
+
+WSMETHOD WSDadosItensCEFornecedor WSRECEIVE UserCode, cNUMCE WSSEND cRetorno WSSERVICE WSSEMAR
+// Definição de variáveis
+	Local aArea 		:= getArea()
+	Local cAlias2		:= "TBN"
+	Local lRetorno 		:= .T.
+	Local cAliasSC8		:= "SC8"
+	Local cAliasSA2		:= "SA2"
+	Local cAliasSA5		:= "SA5" 
+	Local cAliasSB1		:= "SB1" 
+	Local cAliasAI3		:= "AI3"
+	Local cNumFornece	:= ""
+	Local cCNPJ			:= ""
+	
+	Local cQuery1		:= ""
+	Local __CONNECT 	:= "TOPCONN"
+// ARRAY JSON DE RETORNO
+	Local aaMsgRetorno	:= Array(#)
+
+	IF PrtChkUser(::UserCode,"WSSEMAR","WSDadosItensCEFornecedor")
+	   // Pegando código do fornecedor
+	    
+	   	dbselectarea(cAliasAI3)
+	   	dbSetOrder(1)
+		MsSeek(xFilial(cAliasAI3)+::UserCode)
+		IF FOUND()
+			// CNPJ do fornecedor
+		   	cCNPJ := cValToChar(AllTrim((cAliasAI3)->AI3_CNPJ))
+		   	
+		   	dbselectarea(cAliasSA2)
+		   	dbSetOrder(3)
+		   	MsSeek(xFilial(cAliasSA2)+cCNPJ)
+		   	
+		   	// Código do fornecedor
+		   	cNumFornece := cValToChar(AllTrim((cAliasSA2)->A2_COD))
+	   	
+			cQuery2 := "SELECT C8_FILIAL, C8_NUM, C8_NUMSC , C8_PRODUTO, C8_FORNECE, "
+			cQuery2 += " C8_ITEM, B1_DESC, C8_QUANT, C8_PRECO, C8_VALICM , C8_VALIPI, C8_MSG "
+		 	cQuery2 += " FROM "+RetSqlName(cAliasSC8)+" SC8 "
+			cQuery2 += "	INNER JOIN "+RelSqlName(cAliasSB1)+" SB1 "
+			cQuery2 += "		ON SC8.C8_PRODUTO = SB1.B1_COD "
+			cQuery2 += " AND SC8.C8_FILIAL = '"+xFilial(cAliasSC8)+"' "
+			cQuery2 += " WHERE SC8.C8_NUM = '"+cValToChar(AllTrim(::cNUMCE))+"' AND SC8.C8_FORNECE = '"+cNumFornece+"' "
+			cQuery2 += " AND SC8.D_E_L_E_T_ = '' AND SB1.D_E_L_E_T_ = '' "
+			cQuery2 += " ORDER BY SC8.C8_ITEM"
+			ConOut( "# ================ QUERY ================= #")
+			cQuery2 := ChangeQuery( cQuery2 )
+			dbUseArea(.T.,__CONNECT,TcGenQry(,,cQuery2),cAlias2,.F.,.T.)
+			(cAlias2)->(DbGoTop())
+			While !(cAlias2)->(Eof())
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))] = Array(#)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'FILIAL'] 	:= cValToChar((cAlias2)->C8_FILIAL)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'NUMCE'] 	:= cValToChar((cAlias2)->C8_NUM)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'NUMSC'] 	:= cValToChar((cAlias2)->C8_NUMSC)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'PRODUTO']	:= cValToChar((cAlias2)->C8_PRODUTO)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'FORNECE']	:= cValToChar((cAlias2)->C8_FORNECE)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'ITEM'] 	:= cValToChar((cAlias2)->C8_ITEM)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'DESC'] 	:= cValToChar((cAlias2)->B1_DESC)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'QUANT'] 	:= cValToChar((cAlias2)->C8_QUANT)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'PRECO'] 	:= cValToChar((cAlias2)->C8_PRECO)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'ICMS'] 	:= cValToChar((cAlias2)->C8_VALICM)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'IPI'] 	:= cValToChar((cAlias2)->C8_VALIPI)
+				aaMsgRetorno[#(cValToChar((cAlias2)->C8_ITEM))][#'MSG'] 	:= cValToChar((cAlias2)->C8_MSG)
+			(cAlias2)->(DbSkip())
+			EndDo
+		
+		ELSE
+	   	ENDIF
+		::cRetorno := ToJson(aaMsgRetorno)
+	ELSE // IF PrtChkUser
+		lRetorno := .F.
+	ENDIF
+	RestArea(aArea)
+Return (lRetorno)
+                    
