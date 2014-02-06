@@ -1834,7 +1834,8 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 			// Código do fornecedor		
 			// Caso esteja em branco: Fazer busca de todos os fornecedores para esse C1_PRODUTO ( Cód. Produto )
 			cCodFornece := cValToChar(AllTrim((cAlias)->C1_FORNECE))
-			IF !Empty(cCodFornece)  
+			// Cotação direta para fornecedor ( Fornecedor informado )
+			IF !Empty(cCodFornece)
 			// Garantindo transação
 			Begin Transaction
 				//==================================================================
@@ -1872,7 +1873,17 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 							dbSelectArea("SA5")
 							dbSetOrder(1)
 							lAchou:=MsSeek(xFilial("SA5")+(cAlias)->C1_FORNECE+(cAlias)->C1_LOJA+(cAlias)->C1_PRODUTO)
-							If !lAchou
+							If !lAchou // Não Achou Fornecedor X Produto
+								// Grava fornecedor x produto
+								RecLock("SA5",.T.)
+								SA5->A5_FILIAl := xFilial("SA5")
+								SA5->A5_FORNECE := (cAlias)->C1_FORNECE
+								SA5->A5_LOJA := (cAlias)->C1_LOJA
+								SA5->A5_NOMEFOR := SA2->A2_NOME
+								SA5->A5_PRODUTO := (cAlias)->C1_PRODUTO
+								SA5->A5_NOMPROD := SB1->B1_DESC
+								SA5->(MsUnLock())
+								// Finaliza gravação
 								dbSelectArea("SA5")
 								dbSetOrder(9)
 								lAchou:=MsSeek(xFilial("SA5")+(cAlias)->C1_FORNECE+(cAlias)->C1_LOJA+(cAlias)->C1_PRODUTO)
