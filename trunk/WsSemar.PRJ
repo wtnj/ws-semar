@@ -16,8 +16,11 @@ Group Web Service
       FoldersCount=2
       Folder Fontes
          VSSPath=Fontes
-         FilesCount=1
+         FilesCount=2
          File \Projetos\Advpl\svn-ws-semar\WSSEMAR.PRW
+             Type=T
+         End
+         File \Projetos\Advpl\webservice\tArrayPipe.PRW
              Type=T
          End
       End
