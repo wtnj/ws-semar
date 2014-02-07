@@ -669,7 +669,7 @@ Return(lRetorno)
 	Local lRetorno 	:= .T.
 	Local aColunas	:= {}
 
-	If PrtChkUser(::UserCode,"WSSEMAR","WSGetDadosDicionario")
+	If PrtChkUser(::UserCode,"WSSEMAR","WSGetDadosAtivacao")
 	// Seleciona o "Base de dados" ( Tabela )
 		dbSelectArea(cAlias)
 	// Seleciona o Indice do "Alias"
@@ -1732,7 +1732,8 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 	Local nAmarracao  	:= 1
 	Local nIndiceRet	:= 1   
 	Local nIdent		:= 0
-	Local nIdentForn	:= 0
+	Local nIdentForn	:= 0 
+	Local nError		:= 0
 	Local cIdent		:= ""
 	//Local aAreaSC1	:= SC1->(GetArea())
 	Local aAreaSB1	  := SB1->(GetArea())
@@ -1810,7 +1811,10 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 		// Numero sequêncial da cotação de compra ( C8_NUM
 		cNumCot 	:= u_smgetSeq("SC8","C8_NUM")
 		cCotaGrp 	:= cValToChar(AllTrim(GetMv("MV_RESTCOM")))
-		
+		// Total de erros da amarração fornecedor X produto
+		nTotalError := 1
+		// Iniciando bloco do array resevando para erros de amarracao
+		aaMsgRetorno[#'msgerror'] := Array(#)
 		// 1º Step Lista itens ds SC para iniciar a transferencia para SC8
 		cAlias := GetNextAlias()
 		cQuery := "SELECT * FROM "+RetSqlName(cAliasSC1)
@@ -1873,6 +1877,14 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 							dbSelectArea("SA5")
 							dbSetOrder(1)
 							lAchou:=MsSeek(xFilial("SA5")+(cAlias)->C1_FORNECE+(cAlias)->C1_LOJA+(cAlias)->C1_PRODUTO)
+							
+							ConOut( "# ================================================== #")
+							ConOut( "# ===Buscando AMARRACAO============================= #")
+							ConOut( "# ================================================== #")
+							ConOut( "# ===Achou? ["+cValToChar(lAchou)+"]================================== #")
+							ConOut( "# ================================================== #")
+							//Sleep(10000)
+							
 							If !lAchou // Não Achou Fornecedor X Produto
 								// Grava fornecedor x produto
 								RecLock("SA5",.T.)
@@ -2021,176 +2033,193 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 				ConOut( "# ================ QUERY ================= #")				
 				cQuery2 := ChangeQuery( cQuery2 )
 				dbUseArea(.T.,__CONNECT,TcGenQry(,,cQuery2),cAlias2,.F.,.T.)
-				(cAlias2)->(DbGoTop())
-				While !(cAlias2)->(Eof())
-					// Adicionar Fornecedor para consultar
-					aAdd(aSeqItenForne,cValToChar(AllTrim((cAlias2)->A5_FORNECE)))
-					// Zera Sequenciador
-					nSeqItenForne 	:= 0 
-					nIdentForn 		:= nIdent
-					//==================================================================
-					// BLOCO PARA CALCULO DE DATA DE VALIDADE DA COTAÇÃO
-					//==================================================================
-						While nDiasVal > 0
-					        dValidade++				
-							dValida := DataValida(dValidade)
-					        If dValida == dValidade
-								nDiasVal--
-					        EndIf
-						EndDo
-					//================================================================== 
-					// Buscando fornecedor no array de fornecedores
-					FOR nBusca:=1 To Len(aSeqItenForne)
-						IF cValToChar(AllTrim(aSeqItenForne[nBusca])) == cValToChar(AllTrim((cAlias2)->A5_FORNECE))
-						  nSeqItenForne++
-						EndIf
-					Next
-					// Numero da sequência para o fornecedor X
-					cSeqItenForne 	:= StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
-					cIdentForn		:= StrZero(nIdentForn,Len(SC8->C8_IDENT))
-					
-					
-					
-					// Coisa velha :D
-					/*IF cValToChar(AllTrim(cCodFornece)) == cValToChar(AllTrim((cAlias2)->A5_FORNECE))
-						nSeqItenForne++ 
-			   			cSeqItenForne := StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
-					Else
-						nSeqItenForne := 1
-						cSeqItenForne := StrZero(1,Len(SC8->C8_IDENT))
-					EndIf
-					*/    
-					
-					
-					cCodFornece := cValToChar(AllTrim((cAlias2)->A5_FORNECE))
-					// Quantidades
-					nQtdSC 	:= (cAlias2)->C1_QUANT - (cAlias2)->C1_QUJE
-					nQtdSC2 := (cAlias2)->C1_QTSEGUM
-					//==================================================================
-					// Posiciona Registros e Atualiza a Amarracao
-					//==================================================================			
-						// Produto
-						dbSelectArea("SB1") 
-						dbSetOrder(1)
-						MsSeek( xFilial("SB1")+(cAlias2)->C1_PRODUTO)
+				// Pega qtd de registros
+				nTotal := (cAlias2)->(LASTREC())
+				// Verifica se existe amarração produto fornecedor
+				
+				IF nTotal > 0
+					(cAlias2)->(DbGoTop())
+					While !(cAlias2)->(Eof())
+						// Adicionar Fornecedor para consultar
+						aAdd(aSeqItenForne,cValToChar(AllTrim((cAlias2)->A5_FORNECE)))
+						// Zera Sequenciador
+						nSeqItenForne 	:= 0 
+						nIdentForn 		:= nIdent
+						//==================================================================
+						// BLOCO PARA CALCULO DE DATA DE VALIDADE DA COTAÇÃO
+						//==================================================================
+							While nDiasVal > 0
+						        dValidade++				
+								dValida := DataValida(dValidade)
+						        If dValida == dValidade
+									nDiasVal--
+						        EndIf
+							EndDo
+						//================================================================== 
+						// Buscando fornecedor no array de fornecedores
+						FOR nBusca:=1 To Len(aSeqItenForne)
+							IF cValToChar(AllTrim(aSeqItenForne[nBusca])) == cValToChar(AllTrim((cAlias2)->A5_FORNECE))
+							  nSeqItenForne++
+							EndIf
+						Next
+						// Numero da sequência para o fornecedor X
+						cSeqItenForne 	:= StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
+						cIdentForn		:= StrZero(nIdentForn,Len(SC8->C8_IDENT))
 						
-						// Fornecedores
-						dbSelectArea("SA2")
-						dbSetOrder(1)
-						MsSeek( xFilial("SA2")+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA)
-					//=================================================================
-					// Regras de Amarração Produto X Fornecedor
-					//=================================================================
-							dbSelectArea("SA5")
+						
+						
+						// Coisa velha :D
+						/*IF cValToChar(AllTrim(cCodFornece)) == cValToChar(AllTrim((cAlias2)->A5_FORNECE))
+							nSeqItenForne++ 
+				   			cSeqItenForne := StrZero(nSeqItenForne,Len(SC8->C8_IDENT))
+						Else
+							nSeqItenForne := 1
+							cSeqItenForne := StrZero(1,Len(SC8->C8_IDENT))
+						EndIf
+						*/    
+						
+						
+						cCodFornece := cValToChar(AllTrim((cAlias2)->A5_FORNECE))
+						// Quantidades
+						nQtdSC 	:= (cAlias2)->C1_QUANT - (cAlias2)->C1_QUJE
+						nQtdSC2 := (cAlias2)->C1_QTSEGUM
+						//==================================================================
+						// Posiciona Registros e Atualiza a Amarracao
+						//==================================================================			
+							// Produto
+							dbSelectArea("SB1") 
 							dbSetOrder(1)
-							lAchou:=MsSeek(xFilial("SA5")+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA+(cAlias2)->C1_PRODUTO) 							
-							If !lAchou
+							MsSeek( xFilial("SB1")+(cAlias2)->C1_PRODUTO)
+							
+							// Fornecedores
+							dbSelectArea("SA2")
+							dbSetOrder(1)
+							MsSeek( xFilial("SA2")+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA)
+						//=================================================================
+						// Regras de Amarração Produto X Fornecedor
+						//=================================================================
 								dbSelectArea("SA5")
-								dbSetOrder(9)
-								lAchou:=MsSeek(xFilial("SA5")+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA+(cAlias2)->C1_PRODUTO)
-							Endif	
-							If lAchou
-								cCodTab := SA5->A5_CODTAB
-							Endif
-						//==============================================================================
-						// Regras de MV_PAR06 ( Amarração de Preço )
-						//==============================================================================							
-							//--------------------------------------------------------------------------
-							// Carrega o codigo da tabela de precos do grupo X fornecedor caso hover.  
-							//--------------------------------------------------------------------------
-							If SAD->(FieldPos("AD_CODTAB")) > 0
-								If (nAmarracao == 2 .Or. nAmarracao == 3 )// Grupo
-									dbSelectArea("SAD")
-									dbSetOrder(2)
-									MsSeek(xFilial("SAD")+SB1->B1_GRUPO+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA)
-									If Empty(cCodTab)
-										cCodTab := SAD->AD_CODTAB
+								dbSetOrder(1)
+								lAchou:=MsSeek(xFilial("SA5")+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA+(cAlias2)->C1_PRODUTO) 							
+								If !lAchou
+									dbSelectArea("SA5")
+									dbSetOrder(9)
+									lAchou:=MsSeek(xFilial("SA5")+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA+(cAlias2)->C1_PRODUTO)
+								Endif	
+								If lAchou
+									cCodTab := SA5->A5_CODTAB
+								Endif
+							//==============================================================================
+							// Regras de MV_PAR06 ( Amarração de Preço )
+							//==============================================================================							
+								//--------------------------------------------------------------------------
+								// Carrega o codigo da tabela de precos do grupo X fornecedor caso hover.  
+								//--------------------------------------------------------------------------
+								If SAD->(FieldPos("AD_CODTAB")) > 0
+									If (nAmarracao == 2 .Or. nAmarracao == 3 )// Grupo
+										dbSelectArea("SAD")
+										dbSetOrder(2)
+										MsSeek(xFilial("SAD")+SB1->B1_GRUPO+(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA)
+										If Empty(cCodTab)
+											cCodTab := SAD->AD_CODTAB
+										EndIf
 									EndIf
 								EndIf
-							EndIf
-			
-							//--------------------------------------------------------------------------
-							// Ponto de Entrada para selecionar uma nova tabela de preco para cotacao. 
-							//--------------------------------------------------------------------------	
-							If ExistBlock("A130CODTAB")
-								cNewCodTab:=ExecBlock("A130CODTAB",.F.,.F.,{(cAlias2)->C1_PRODUTO,SB1->B1_GRUPO,(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA,cCodtab})
-								If ValType(cNewCodTab) == "C"
-									cCodTab:=cNewCodTab
+				
+								//--------------------------------------------------------------------------
+								// Ponto de Entrada para selecionar uma nova tabela de preco para cotacao. 
+								//--------------------------------------------------------------------------	
+								If ExistBlock("A130CODTAB")
+									cNewCodTab:=ExecBlock("A130CODTAB",.F.,.F.,{(cAlias2)->C1_PRODUTO,SB1->B1_GRUPO,(cAlias2)->A5_FORNECE+(cAlias2)->A5_LOJA,cCodtab})
+									If ValType(cNewCodTab) == "C"
+										cCodTab:=cNewCodTab
+									EndIf
+								EndIf
+						 //==============================================================================
+					 	ConOut( "# ================Iniciando gravação de dados================= #")
+					 	ConOut( "# -Produto["+(cAlias2)->C1_PRODUTO+"]---- X ---- Fornecedor["+cCodFornece+"]------ #")
+					 	ConOut( "# -Sequencia e => ["+cSeqItenForne+"] #")
+					 	ConOut( "# ================Gravando Produto X Fornecedor ============== #")
+						// Gravando dados 
+							RecLock("SC8",.T.)
+							SC8->C8_FILIAL  := xFilial("SC8")
+							SC8->C8_FILENT  := (cAlias2)->C1_FILENT
+							SC8->C8_NUM     := cNumCot // Numero da cotação (Ex: 000001, 000002 ...)
+							SC8->C8_ITEM    := cValToChar(AllTrim(cSeqItenForne)) //If(nScan == Nil, cItem, aGrade[nScan, 3]) // Sequência numérica, por fornecedor
+							SC8->C8_EMISSAO := dDataBase
+							SC8->C8_CONTATO := SA2->A2_CONTATO
+							SC8->C8_GRUPCOM := (cAlias2)->C1_GRUPCOM
+							SC8->C8_COND    := SA2->A2_COND
+							SC8->C8_FORNECE := SA2->A2_COD
+							SC8->C8_LOJA    := SA2->A2_LOJA
+							SC8->C8_PRODUTO := (cAlias2)->C1_PRODUTO
+							SC8->C8_PRAZO   := RetFldProd(SB1->B1_COD,"B1_PE")
+							SC8->C8_UM      := (cAlias2)->C1_UM
+							SC8->C8_VALIDA  := dValidade
+							SC8->C8_QUANT   := nQtdSC
+							SC8->C8_NUMPRO  := "01"
+							SC8->C8_DATPRF  := Max(SToD((cAlias2)->C1_DATPRF),dDataBase) // Verificar
+							SC8->C8_NUMSC   := (cAlias2)->C1_NUM
+							SC8->C8_ITEMSC  := (cAlias2)->C1_ITEM // Sequência numérica da propria SC
+							SC8->C8_ITSCGRD := (cAlias2)->C1_ITEMGRD
+							SC8->C8_OBS     := (cAlias2)->C1_OBS
+							SC8->C8_IDENT   := cValToChar(cIdentForn) //If(nScan == Nil,cIdent ,aGrade[nScan, 5]) // Sequencia numerica dos itens da cotação
+							SC8->C8_SEGUM	:= (cAlias2)->C1_SEGUM
+							SC8->C8_QTSEGUM := nQtdSC2
+							SC8->C8_CODTAB  := cCodTab
+							SC8->C8_ORIGEM  := (cAlias2)->C1_ORIGEM
+							// cPaisLoc 
+							SC8->C8_PICM    := SB1->B1_PICM
+							SC8->C8_ALIIPI  := SB1->B1_IPI
+							// Não Sei
+							//SC8->C8_ITEMGRD := (cAlias2)->C1_IDENT//If(nScan == Nil, "" , aGrade[nScan, 4])
+							//SC8->C8_GRADE   := If(nScan == Nil, "" , "S")
+							If !Empty(SC8->C8_CODTAB)
+								dbSelectArea("AIA")
+								dbSetOrder(1)
+								If MsSeek(xFilial("AIA")+SC8->C8_FORNECE+SC8->C8_LOJA+SC8->C8_CODTAB)
+									If !Empty(AIA->AIA_CONDPG)
+										SC8->C8_COND := AIA->AIA_CONDPG
+									EndIf
+									SC8->C8_PRECO   := MaTabPrCom(SC8->C8_CODTAB,SC8->C8_PRODUTO,SC8->C8_QUANT,SC8->C8_FORNECE,SC8->C8_LOJA,1,SC8->C8_EMISSAO)
+									SC8->C8_TOTAL   := NoRound(SC8->C8_QUANT*SC8->C8_PRECO,2)
 								EndIf
 							EndIf
-					 //==============================================================================
-				 	ConOut( "# ================Iniciando gravação de dados================= #")
-				 	ConOut( "# -Produto["+(cAlias2)->C1_PRODUTO+"]---- X ---- Fornecedor["+cCodFornece+"]------ #")
-				 	ConOut( "# -Sequencia e => ["+cSeqItenForne+"] #")
-				 	ConOut( "# ================Gravando Produto X Fornecedor ============== #")
-					// Gravando dados 
-						RecLock("SC8",.T.)
-						SC8->C8_FILIAL  := xFilial("SC8")
-						SC8->C8_FILENT  := (cAlias2)->C1_FILENT
-						SC8->C8_NUM     := cNumCot // Numero da cotação (Ex: 000001, 000002 ...)
-						SC8->C8_ITEM    := cValToChar(AllTrim(cSeqItenForne)) //If(nScan == Nil, cItem, aGrade[nScan, 3]) // Sequência numérica, por fornecedor
-						SC8->C8_EMISSAO := dDataBase
-						SC8->C8_CONTATO := SA2->A2_CONTATO
-						SC8->C8_GRUPCOM := (cAlias2)->C1_GRUPCOM
-						SC8->C8_COND    := SA2->A2_COND
-						SC8->C8_FORNECE := SA2->A2_COD
-						SC8->C8_LOJA    := SA2->A2_LOJA
-						SC8->C8_PRODUTO := (cAlias2)->C1_PRODUTO
-						SC8->C8_PRAZO   := RetFldProd(SB1->B1_COD,"B1_PE")
-						SC8->C8_UM      := (cAlias2)->C1_UM
-						SC8->C8_VALIDA  := dValidade
-						SC8->C8_QUANT   := nQtdSC
-						SC8->C8_NUMPRO  := "01"
-						SC8->C8_DATPRF  := Max(SToD((cAlias2)->C1_DATPRF),dDataBase) // Verificar
-						SC8->C8_NUMSC   := (cAlias2)->C1_NUM
-						SC8->C8_ITEMSC  := (cAlias2)->C1_ITEM // Sequência numérica da propria SC
-						SC8->C8_ITSCGRD := (cAlias2)->C1_ITEMGRD
-						SC8->C8_OBS     := (cAlias2)->C1_OBS
-						SC8->C8_IDENT   := cValToChar(cIdentForn) //If(nScan == Nil,cIdent ,aGrade[nScan, 5]) // Sequencia numerica dos itens da cotação
-						SC8->C8_SEGUM	:= (cAlias2)->C1_SEGUM
-						SC8->C8_QTSEGUM := nQtdSC2
-						SC8->C8_CODTAB  := cCodTab
-						SC8->C8_ORIGEM  := (cAlias2)->C1_ORIGEM
-						// cPaisLoc 
-						SC8->C8_PICM    := SB1->B1_PICM
-						SC8->C8_ALIIPI  := SB1->B1_IPI
-						// Não Sei
-						//SC8->C8_ITEMGRD := (cAlias2)->C1_IDENT//If(nScan == Nil, "" , aGrade[nScan, 4])
-						//SC8->C8_GRADE   := If(nScan == Nil, "" , "S")
-						If !Empty(SC8->C8_CODTAB)
-							dbSelectArea("AIA")
+							SC8->(MsUnLock()) 
+						ConOut( "# ================Final da gravanção Produto X Fornecedor ============== #")  
+						ConOut( "# ======= Gravando numero da cotação em SC1 ======================== #") 
+							dbSelectArea("SC1")
 							dbSetOrder(1)
-							If MsSeek(xFilial("AIA")+SC8->C8_FORNECE+SC8->C8_LOJA+SC8->C8_CODTAB)
-								If !Empty(AIA->AIA_CONDPG)
-									SC8->C8_COND := AIA->AIA_CONDPG
-								EndIf
-								SC8->C8_PRECO   := MaTabPrCom(SC8->C8_CODTAB,SC8->C8_PRODUTO,SC8->C8_QUANT,SC8->C8_FORNECE,SC8->C8_LOJA,1,SC8->C8_EMISSAO)
-								SC8->C8_TOTAL   := NoRound(SC8->C8_QUANT*SC8->C8_PRECO,2)
-							EndIf
-						EndIf
-						SC8->(MsUnLock()) 
-					ConOut( "# ================Final da gravanção Produto X Fornecedor ============== #")  
-					ConOut( "# ======= Gravando numero da cotação em SC1 ======================== #") 
-						dbSelectArea("SC1")
-						dbSetOrder(1)
-						MsSeek(xFilial("SC1")+(cAlias)->C1_NUM+(cAlias)->C1_ITEM)
-						RecLock("SC1",.F.)
-						SC1->C1_COTACAO:= cNumCot
-						//SC1->C1_IDENT   := If(nScan == Nil,cIdent ,aGrade[nScan, 5])
-						MsUnLock()
-					aaMsgRetorno[#(cValToChar(nIndiceRet))] := Array(#)
-					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nNumCotacao'] := cNumCot 
-					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nNumSC'] := cValToChar(AllTrim((cAlias)->C1_NUM))
-					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nFornecedor'] := cValToChar(AllTrim(SA2->A2_COD))
-					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'cNomeFornecedor'] := cValToChar(AllTrim(SA2->A2_NOME))
-					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'cEmailFornecedor'] := cValToChar(AllTrim(SA2->A2_EMAIL))
-					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nItem'] := cValToChar(AllTrim((cAlias)->C1_ITEM))
-					aaMsgRetorno[#(cValToChar(nIndiceRet))][#'msg'] := "sucesso"
-					nIndiceRet++
-					ConOut( "# ======= Gravação finalizada com sucesso !! ======================= #") 
-					(cAlias2)->(DbSkip())
-					
-				EndDo // Fecha While !(cAlias2)->(Eof()) ( Varios Fornecedores X produto ) 
+							MsSeek(xFilial("SC1")+(cAlias)->C1_NUM+(cAlias)->C1_ITEM)
+							RecLock("SC1",.F.)
+							SC1->C1_COTACAO:= cNumCot
+							//SC1->C1_IDENT   := If(nScan == Nil,cIdent ,aGrade[nScan, 5])
+							MsUnLock()
+						aaMsgRetorno[#(cValToChar(nIndiceRet))] := Array(#)
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nNumCotacao'] := cNumCot 
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nNumSC'] := cValToChar(AllTrim((cAlias)->C1_NUM))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nFornecedor'] := cValToChar(AllTrim(SA2->A2_COD))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'cNomeFornecedor'] := cValToChar(AllTrim(SA2->A2_NOME))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'cEmailFornecedor'] := cValToChar(AllTrim(SA2->A2_EMAIL))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'nItem'] := cValToChar(AllTrim((cAlias)->C1_ITEM))
+						aaMsgRetorno[#(cValToChar(nIndiceRet))][#'msg'] := "sucesso"
+						nIndiceRet++
+						ConOut( "# ======= Gravação finalizada com sucesso !! ======================= #") 
+						(cAlias2)->(DbSkip())
+						
+					EndDo // Fecha While !(cAlias2)->(Eof()) ( Varios Fornecedores X produto ) 
+			ELSE
+			//=====================================================================================
+			// Informando que não foi gerado cotação para o fornecedor pois não existe amarração 
+			//=====================================================================================
+				ConOut( "# ======= Erro nao existe amarracao de produto fornecedor ========== #") 
+				ConOut( "# ======= Produto ["+cValToChar(AllTrim((cAlias)->C1_PRODUTO))+"]========== #") 
+				ConOut( "# ======= nError ["+cValToChar(nTotalError)+"]========== #")						
+				aaMsgRetorno[#'msgerror'][#(cValToChar(nTotalError))] := Array(#)
+				aaMsgRetorno[#'msgerror'][#(cValToChar(nTotalError))][#'msg'] 	 := "errodeamarracao"
+				aaMsgRetorno[#'msgerror'][#(cValToChar(nTotalError))][#'produto'] := cValToChar(AllTrim((cAlias)->C1_PRODUTO))
+				nTotalError++	
+			ENDIF
 			//==================================================================
 			// FIM DO BLOCO PARA COTAÇÃO COM VÁRIOS FORNECEDORES ( Fornecedor não Informado ) 		
 			//==================================================================
