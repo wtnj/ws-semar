@@ -669,7 +669,7 @@ Return(lRetorno)
 	Local lRetorno 	:= .T.
 	Local aColunas	:= {}
 
-	If PrtChkUser(::UserCode,"WSSEMAR","WSGetDadosDicionario")
+	If PrtChkUser(::UserCode,"WSSEMAR","WSGetDadosAtivacao")
 	// Seleciona o "Base de dados" ( Tabela )
 		dbSelectArea(cAlias)
 	// Seleciona o Indice do "Alias"

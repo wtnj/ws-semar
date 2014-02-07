@@ -1886,7 +1886,8 @@ WSMETHOD WSEnviaSCParaCotacao WSRECEIVE UserCode, cNUMSC WSSEND cRetorno WSSERVI
 							//Sleep(10000)
 							
 							If !lAchou // Não Achou Fornecedor X Produto
-								// Grava fornecedor x produto
+								// Grava fornecedor x produto                       
+								
 								RecLock("SA5",.T.)
 								SA5->A5_FILIAl := xFilial("SA5")
 								SA5->A5_FORNECE := (cAlias)->C1_FORNECE
